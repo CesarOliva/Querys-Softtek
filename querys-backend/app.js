@@ -3,6 +3,16 @@ const pool = require("./db");
 const app = express();
 const port = process.env.PORT || 3000;
 
+const STATES = (function(){
+    const Enum = {
+        SELECT: 1,
+        SELECT_WARNING: 2,
+        UPDATE_STOCK: 3,
+        DELETE_PRODUCT: 4,
+        UPDATE_PRODUCT: 5
+    }
+})
+
 app.use(express.json());
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:5173');
@@ -18,8 +28,8 @@ app.get('/health', (req, res) => {
 });
 
 const ejecutarCrud = async (option, data = {}) => {
-    const [resultSets] = await pool.query('CALL CRUD(?, ?)', [option, JSON.stringify(data)]);
-    return resultSets[0] ?? [];
+    const [resultSets] = await pool.query('CALL CrudProductos(?, ?)', [option, JSON.stringify(data)]);
+    return Array.isArray(resultSets) ? (resultSets[0] ?? []) : [];
 };
 
 // Operaciones: 1 listar, 2 advertencias, 3 stock, 4 eliminar, 5 editar.
@@ -42,7 +52,7 @@ app.post('/products/crud', async (req, res) => {
 // Obtener todos los productos desde la tabla producto.
 app.get('/products', async (req, res) => {
     try {
-        res.json(await ejecutarCrud(1));
+        res.json(await ejecutarCrud(SELECT));
     } catch (error) {
         console.error('Error al obtener productos:', error.message);
         res.status(500).json({ error: 'No se pudieron obtener los productos' });
@@ -52,7 +62,7 @@ app.get('/products', async (req, res) => {
 // Obtener productos con stock <= 10.
 app.get('/products/productsWarning', async (req, res) => {
     try {
-        res.json(await ejecutarCrud(2));
+        res.json(await ejecutarCrud(SELECT_WARNING));
     } catch (error) {
         console.error('Error al obtener productos con poco stock:', error.message);
         res.status(500).json({ error: 'No se pudieron obtener los productos con poco stock' });
@@ -71,7 +81,7 @@ app.patch("/products/updateStock/:id", async (req, res) => {
     }
 
     try {
-        const products = await ejecutarCrud(3, { productId, stockUpdate });
+        const products = await ejecutarCrud(UPDATE_STOCK, { productId, stockUpdate });
 
         if (products.length === 0) {
             return res.status(404).json({ error: 'Producto no encontrado' });
@@ -89,7 +99,7 @@ app.delete("/products/delete/:id", async (req, res) => {
     const productId = Number.parseInt(req.params.id, 10);
 
     try {
-        const result = await ejecutarCrud(4, { productId });
+        const result = await ejecutarCrud(DELETE_PRODUCT, { productId });
         if (!result[0]?.affectedRows) {
             return res.status(404).json({ error: 'Producto no encontrado' });
         }
@@ -110,7 +120,7 @@ app.put("/products/update/:id", async (req, res) => {
     }
 
     try {
-        const products = await ejecutarCrud(5, { productId, nombre: nombre.trim(), precio, stock });
+        const products = await ejecutarCrud(UPDATE_PRODUCT, { productId, nombre: nombre.trim(), precio, stock });
         if (products.length === 0) {
             return res.status(404).json({ error: 'Producto no encontrado' });
         }
