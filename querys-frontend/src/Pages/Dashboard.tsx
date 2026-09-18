@@ -1,233 +1,188 @@
-import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import "./Dashboard.css";
 
 type Filtros = {
   genero: string;
   rangoEdad: string;
-  departamento: string;
   idUsuario: string;
 };
 
-const usuarios = [
-  {
-    id: 1001,
-    nombre: "Ana López",
-    genero: "Femenino",
-    edad: 28,
-    departamento: "Recursos Humanos",
-    masajes: true,
-    rehabilitacion: false,
-  },
-  {
-    id: 1002,
-    nombre: "Carlos Pérez",
-    genero: "Masculino",
-    edad: 35,
-    departamento: "Finanzas",
-    masajes: false,
-    rehabilitacion: true,
-  },
-  {
-    id: 1003,
-    nombre: "María García",
-    genero: "Femenino",
-    edad: 42,
-    departamento: "Recursos Humanos",
-    masajes: true,
-    rehabilitacion: true,
-  },
-  {
-    id: 1004,
-    nombre: "Juan Rodríguez",
-    genero: "Masculino",
-    edad: 24,
-    departamento: "Tecnología",
-    masajes: false,
-    rehabilitacion: false,
-  },
-  {
-    id: 1005,
-    nombre: "Laura Martínez",
-    genero: "Femenino",
-    edad: 31,
-    departamento: "Finanzas",
-    masajes: true,
-    rehabilitacion: true,
-  },
-  {
-    id: 1006,
-    nombre: "Pedro Sánchez",
-    genero: "Masculino",
-    edad: 48,
-    departamento: "Operaciones",
-    masajes: true,
-    rehabilitacion: false,
-  },
-  {
-    id: 1007,
-    nombre: "Sofía Torres",
-    genero: "Femenino",
-    edad: 26,
-    departamento: "Tecnología",
-    masajes: false,
-    rehabilitacion: true,
-  },
-  {
-    id: 1008,
-    nombre: "Miguel Hernández",
-    genero: "Masculino",
-    edad: 55,
-    departamento: "Operaciones",
-    masajes: false,
-    rehabilitacion: false,
-  },
-];
+type Empleado = {
+  id: number;
+  nombre?: string;
+  apellido?: string;
+  genero?: string;
+  edad?: number;
+};
 
+type ResumenApi = {
+  total_personas?: number;
+  total_mujeres?: number;
+  total_hombres?: number;
+  total_masaje?: number;
+  total_spa?: number;
+  promedio?: number;
+};
 
+type EdadApi = {
+  edad: number;
+  cantidad: number;
+  porcentaje: number;
+};
 
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+const normalizarGenero = (valor?: string) => {
+  const genero = (valor ?? "").trim().toLowerCase();
+
+  if (["m", "h", "masculino", "hombre"].includes(genero)) return "masculino";
+  if (["f", "femenino", "mujer"].includes(genero)) return "femenino";
+
+  return genero;
+};
+
+const formatearGenero = (valor?: string) => {
+  const genero = (valor ?? "").trim();
+
+  if (["M", "H", "masculino", "Masculino"].includes(genero)) return "Masculino";
+  if (["F", "femenino", "Femenino"].includes(genero)) return "Femenino";
+
+  return genero || "No especificado";
+};
+
+const obtenerNombreCompleto = (usuario: Empleado) => {
+  const nombre = (usuario.nombre ?? "").trim();
+  const apellido = (usuario.apellido ?? "").trim();
+
+  if (nombre && apellido) return `${nombre} ${apellido}`;
+  if (nombre) return nombre;
+  return `Empleado ${usuario.id}`;
+};
 
 function Dashboard() {
-    const [filtros, setFiltros] = useState<Filtros>({
-      genero: "",
-      rangoEdad: "",
-      departamento: "",
-      idUsuario: "",
-    });
+  const [usuarios, setUsuarios] = useState<Empleado[]>([]);
+  const [resumen, setResumen] = useState<ResumenApi>({});
+  const [edades, setEdades] = useState<EdadApi[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [filtros, setFiltros] = useState<Filtros>({
+    genero: "",
+    rangoEdad: "",
+    idUsuario: "",
+  });
   const [menuAbierto, setMenuAbierto] = useState(false);
 
-    const actualizarFiltro = (
-      campo: keyof Filtros,
-      valor: string
-    ) => {
-      setFiltros((prev) => ({
-        ...prev,
-        [campo]: valor,
-      }));
+  useEffect(() => {
+    const cargarDashboard = async () => {
+      try {
+        const [repetidoresRes, mujeresRes, hombresRes, totalRes, masajeRes, spaRes, edadesRes, promedioRes] =
+          await Promise.all([
+            fetch(`${API_BASE_URL}/services/repetidores`),
+            fetch(`${API_BASE_URL}/services/repetidores/mujeres`),
+            fetch(`${API_BASE_URL}/services/repetidores/hombres`),
+            fetch(`${API_BASE_URL}/services/repetidores/total`),
+            fetch(`${API_BASE_URL}/services/masaje/total`),
+            fetch(`${API_BASE_URL}/services/spa/total`),
+            fetch(`${API_BASE_URL}/services/repetidores/edades`),
+            fetch(`${API_BASE_URL}/services/repetidores/promedio-edad`),
+          ]);
+
+        const [repetidores, mujeres, hombres, total, masaje, spa, edadesData, promedio] = await Promise.all([
+          repetidoresRes.json(),
+          mujeresRes.json(),
+          hombresRes.json(),
+          totalRes.json(),
+          masajeRes.json(),
+          spaRes.json(),
+          edadesRes.json(),
+          promedioRes.json(),
+        ]);
+
+        setUsuarios(Array.isArray(repetidores) ? repetidores : []);
+        setResumen({
+          total_personas: Number(total?.total_personas ?? repetidores?.length ?? 0),
+          total_mujeres: Number(mujeres?.total_mujeres ?? 0),
+          total_hombres: Number(hombres?.total_hombres ?? 0),
+          total_masaje: Number(masaje?.total_masaje ?? 0),
+          total_spa: Number(spa?.total_spa ?? 0),
+          promedio: Number(promedio?.promedio ?? 0),
+        });
+        setEdades(Array.isArray(edadesData) ? edadesData : []);
+      } catch (err) {
+        console.error(err);
+        setError("No se pudo cargar la información del dashboard.");
+      } finally {
+        setLoading(false);
+      }
     };
+
+    void cargarDashboard();
+  }, []);
+
+  const actualizarFiltro = (campo: keyof Filtros, valor: string) => {
+    setFiltros((prev) => ({ ...prev, [campo]: valor }));
+  };
 
   const limpiarFiltros = () => {
     setFiltros({
       genero: "",
       rangoEdad: "",
-      departamento: "",
       idUsuario: "",
     });
   };
 
   const usuariosFiltrados = useMemo(() => {
     return usuarios.filter((usuario) => {
-      // Género
-      if (
-        filtros.genero &&
-        usuario.genero !== filtros.genero
-      ) {
+      const generoUsuario = normalizarGenero(usuario.genero);
+      const generoFiltro = normalizarGenero(filtros.genero);
+
+      if (filtros.genero && generoUsuario !== generoFiltro) {
         return false;
       }
 
-      // Departamento
-      if (
-        filtros.departamento &&
-        usuario.departamento !== filtros.departamento
-      ) {
-        return false;
+      if (filtros.idUsuario) {
+        const idUsuario = String(usuario.id ?? "");
+        if (!idUsuario.toLowerCase().includes(filtros.idUsuario.toLowerCase())) {
+          return false;
+        }
       }
 
-      // ID
-      if (
-        filtros.idUsuario &&
-        !String(usuario.id)
-          .toLowerCase()
-          .includes(filtros.idUsuario.toLowerCase())
-      ) {
-        return false;
-      }
-
-      // Rango de edad
       if (filtros.rangoEdad) {
-        const edad = usuario.edad;
+        const edad = Number(usuario.edad ?? 0);
 
-        if (
-          filtros.rangoEdad === "18-25" &&
-          !(edad >= 18 && edad <= 25)
-        ) {
-          return false;
-        }
-
-        if (
-          filtros.rangoEdad === "26-35" &&
-          !(edad >= 26 && edad <= 35)
-        ) {
-          return false;
-        }
-
-        if (
-          filtros.rangoEdad === "36-45" &&
-          !(edad >= 36 && edad <= 45)
-        ) {
-          return false;
-        }
-
-        if (
-          filtros.rangoEdad === "46-55" &&
-          !(edad >= 46 && edad <= 55)
-        ) {
-          return false;
-        }
-
-        if (
-          filtros.rangoEdad === "56+" &&
-          edad < 56
-        ) {
-          return false;
-        }
+        if (filtros.rangoEdad === "18-25" && !(edad >= 18 && edad <= 25)) return false;
+        if (filtros.rangoEdad === "26-35" && !(edad >= 26 && edad <= 35)) return false;
+        if (filtros.rangoEdad === "36-45" && !(edad >= 36 && edad <= 45)) return false;
+        if (filtros.rangoEdad === "46-55" && !(edad >= 46 && edad <= 55)) return false;
+        if (filtros.rangoEdad === "56+" && edad < 56) return false;
       }
 
       return true;
     });
-  }, [filtros]);
+  }, [filtros, usuarios]);
 
-  const estadisticas = useMemo(() => {
-    return usuariosFiltrados.reduce(
-      (acc, usuario) => {
-        if (
-          usuario.masajes &&
-          usuario.rehabilitacion
-        ) {
-          acc.ambos++;
-        } else if (usuario.masajes) {
-          acc.masajes++;
-        } else if (usuario.rehabilitacion) {
-          acc.rehabilitacion++;
-        } else {
-          acc.ninguno++;
-        }
+  const totalVista = usuariosFiltrados.length;
+  const totalRepetidores = Number(resumen.total_personas ?? usuarios.length ?? 0);
+  const totalMasaje = Number(resumen.total_masaje ?? 0);
+  const totalSpa = Number(resumen.total_spa ?? 0);
+  const totalMujeres = Number(resumen.total_mujeres ?? 0);
+  const totalHombres = Number(resumen.total_hombres ?? 0);
+  const promedioEdad = Number(resumen.promedio ?? 0);
 
-        return acc;
-      },
-      {
-        masajes: 0,
-        rehabilitacion: 0,
-        ambos: 0,
-        ninguno: 0,
-      }
-    );
-  }, [usuariosFiltrados]);
-
-  const total = usuariosFiltrados.length;
-
-  const porcentaje = (cantidad: number): number => {
-    if (!total) return 0;
-    return Math.round((cantidad / total) * 100);
+  const porcentaje = (cantidad: number, base: number) => {
+    if (!base) return 0;
+    return Math.round((cantidad / base) * 100);
   };
 
+  const maxEdad = edades.reduce((max, item) => Math.max(max, Number(item.cantidad ?? 0)), 0);
 
   return (
     <div className="app">
-<link
-  href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
-  rel="stylesheet"
-/>
-      {/* SIDEBAR */}
+      <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+      />
+
       <aside className={`sidebar ${menuAbierto ? "open" : ""}`}>
         <div className="sidebar-container">
           <div className="logo">
@@ -239,29 +194,17 @@ function Dashboard() {
           </div>
 
           <nav>
-            <a
-              href="#dashboard"
-              className="nav-item active"
-              onClick={() => setMenuAbierto(false)}
-            >
+            <a href="#dashboard" className="nav-item active" onClick={() => setMenuAbierto(false)}>
               <span>▦</span>
               Dashboard
             </a>
 
-                <a
-              href="#reportes"
-              className="nav-item"
-              onClick={() => setMenuAbierto(false)}
-            >
+            <a href="#reportes" className="nav-item" onClick={() => setMenuAbierto(false)}>
               <span>📊</span>
               Reportes
             </a>
 
-            <a
-              href="#usuarios"
-              className="nav-item"
-              onClick={() => setMenuAbierto(false)}
-            >
+            <a href="#usuarios" className="nav-item" onClick={() => setMenuAbierto(false)}>
               <span>👥</span>
               Usuarios
             </a>
@@ -269,505 +212,241 @@ function Dashboard() {
         </div>
       </aside>
 
-      {/* CONTENIDO */}
       <main className="main" id="dashboard">
-
-        {/* HEADER */}
         <header className="header">
-          <button
-            className="mobile-menu"
-            onClick={() => setMenuAbierto(!menuAbierto)}
-          >
+          <button className="mobile-menu" onClick={() => setMenuAbierto(!menuAbierto)}>
             ☰
           </button>
 
           <div>
             <h1>Dashboard de servicios</h1>
-            <p>
-              Consulta y analiza el uso de los servicios de bienestar.
-            </p>
+            <p>Consulta y analiza el uso de los servicios de bienestar.</p>
           </div>
 
           <div className="header-date">
             <span>Última actualización</span>
-            <strong>17 Sep 2026</strong>
+            <strong>
+              {new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+            </strong>
           </div>
         </header>
-        
-<div className="content-layout">
 
-  {/* =========================================
-      CONTENIDO PRINCIPAL — IZQUIERDA
-  ========================================= */}
+        <div className="content-layout">
+          <div className="dashboard-content">
+            <section className="stats">
+              <StatCard
+                title="Masajes"
+                value={totalMasaje}
+                percentage={porcentaje(totalMasaje, totalRepetidores || 1)}
+                icon="💆"
+                color="blue"
+              />
 
-  <div className="dashboard-content">
+              <StatCard
+                title="Spa"
+                value={totalSpa}
+                percentage={porcentaje(totalSpa, totalRepetidores || 1)}
+                icon="🧖"
+                color="purple"
+              />
 
-    {/* TARJETAS */}
-    <section className="stats">
+              <StatCard
+                title="Repetidores"
+                value={totalRepetidores}
+                percentage={porcentaje(totalRepetidores, totalRepetidores || 1)}
+                icon="🔄"
+                color="green"
+              />
 
-      <StatCard
-        title="Masajes"
-        value={estadisticas.masajes}
-        percentage={porcentaje(estadisticas.masajes)}
-        icon="💆"
-        color="blue"
-      />
+              <StatCard
+                title="Promedio edad"
+                value={Number(promedioEdad.toFixed(2))}
+                percentage={porcentaje(Math.round(promedioEdad), totalRepetidores || 1)}
+                icon="📈"
+                color="orange"
+              />
+            </section>
 
-      <StatCard
-        title="Rehabilitación"
-        value={estadisticas.rehabilitacion}
-        percentage={porcentaje(estadisticas.rehabilitacion)}
-        icon="🏥"
-        color="purple"
-      />
+            <section id="reportes" className="dashboard-grid">
+              <div className="card chart-card">
+                <div className="card-title">
+                  <div>
+                    <h2>Distribución por edad</h2>
+                    <p>Participación de empleados repetidores por grupo etario.</p>
+                  </div>
+                </div>
 
-      <StatCard
-        title="Ambos servicios"
-        value={estadisticas.ambos}
-        percentage={porcentaje(estadisticas.ambos)}
-        icon="🔄"
-        color="green"
-      />
+                <div className="chart">
+                  {edades.length > 0 ? (
+                    edades.map((item) => (
+                      <Bar key={item.edad} label={`Edad ${item.edad}`} value={item.cantidad} total={maxEdad || 1} color="#2563eb" />
+                    ))
+                  ) : (
+                    <p className="empty">No hay datos de edad disponibles.</p>
+                  )}
+                </div>
+              </div>
 
-      <StatCard
-        title="Ningún servicio"
-        value={estadisticas.ninguno}
-        percentage={porcentaje(estadisticas.ninguno)}
-        icon="○"
-        color="orange"
-      />
+              <div className="card summary-card">
+                <div className="card-title">
+                  <div>
+                    <h2>Resumen</h2>
+                    <p>Datos generales</p>
+                  </div>
+                </div>
 
-    </section>
-
-
-    {/* GRÁFICAS */}
-    <section id="reportes" className="dashboard-grid">
-
-      {/* GRÁFICA */}
-      <div className="card chart-card">
-
-        <div className="card-title">
-          <div>
-            <h2>Usuarios por servicio</h2>
-            <p>
-              Distribución de usuarios según los servicios utilizados.
-            </p>
-          </div>
-        </div>
-
-        <div className="chart">
-
-          <Bar
-            label="Masajes"
-            value={estadisticas.masajes}
-            total={total}
-            color="#2563eb"
-          />
-
-          <Bar
-            label="Rehabilitación"
-            value={estadisticas.rehabilitacion}
-            total={total}
-            color="#7c3aed"
-          />
-
-          <Bar
-            label="Ambos"
-            value={estadisticas.ambos}
-            total={total}
-            color="#059669"
-          />
-
-          <Bar
-            label="Ninguno"
-            value={estadisticas.ninguno}
-            total={total}
-            color="#f59e0b"
-          />
-
-        </div>
-
-      </div>
-
-
-      {/* RESUMEN */}
-      <div className="card summary-card">
-
-        <div className="card-title">
-          <div>
-            <h2>Resumen</h2>
-            <p>Usuarios filtrados</p>
-          </div>
-        </div>
-
-        <div className="donut-container">
-
-          <div
-            className="donut"
-            style={{
-              background: `conic-gradient(
-                #2563eb 0% ${porcentaje(estadisticas.masajes)}%,
-                #7c3aed ${porcentaje(estadisticas.masajes)}% ${
-                  porcentaje(estadisticas.masajes) +
-                  porcentaje(estadisticas.rehabilitacion)
-                }%,
-                #059669 ${
-                  porcentaje(estadisticas.masajes) +
-                  porcentaje(estadisticas.rehabilitacion)
-                }% ${
-                  porcentaje(estadisticas.masajes) +
-                  porcentaje(estadisticas.rehabilitacion) +
-                  porcentaje(estadisticas.ambos)
-                }%,
-                #f59e0b ${
-                  porcentaje(estadisticas.masajes) +
-                  porcentaje(estadisticas.rehabilitacion) +
-                  porcentaje(estadisticas.ambos)
-                }% 100%
-              )`,
-            }}
-          >
-            <div>
-              <strong>{total}</strong>
-              <span>Usuarios</span>
-            </div>
-          </div>
-
-        </div>
-
-        <div className="legend">
-
-          <Legend
-            color="#2563eb"
-            label="Masajes"
-            value={estadisticas.masajes}
-          />
-
-          <Legend
-            color="#7c3aed"
-            label="Rehabilitación"
-            value={estadisticas.rehabilitacion}
-          />
-
-          <Legend
-            color="#059669"
-            label="Ambos"
-            value={estadisticas.ambos}
-          />
-
-          <Legend
-            color="#f59e0b"
-            label="Ninguno"
-            value={estadisticas.ninguno}
-          />
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    {/* TABLA */}
-    <section className="card table-card" id="usuarios">
-
-      <div className="card-title table-header">
-
-        <div>
-          <h2>Usuarios</h2>
-          <p>
-            Detalle de usuarios que coinciden con los filtros.
-          </p>
-        </div>
-
-        <span className="counter">
-          {usuariosFiltrados.length} registros
-        </span>
-
-      </div>
-
-      <div className="table-container">
-
-        <table>
-
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Usuario</th>
-              <th>Género</th>
-              <th>Edad</th>
-              <th>Departamento</th>
-              <th>Servicio</th>
-              <th>Fecha</th>
-            </tr>
-          </thead>
-
-          <tbody>
-
-            {usuariosFiltrados.map((usuario) => {
-
-              let categoria = "Ninguno";
-
-              if (
-                usuario.masajes &&
-                usuario.rehabilitacion
-              ) {
-                categoria = "Ambos";
-              } else if (usuario.masajes) {
-                categoria = "Masajes";
-              } else if (usuario.rehabilitacion) {
-                categoria = "Rehabilitación";
-              }
-
-              return (
-                <tr key={usuario.id}>
-
-                  <td>
-                    <strong>
-                      #{usuario.id}
-                    </strong>
-                  </td>
-
-                  <td>
-                    <div className="user-cell">
-
-                      <div className="small-avatar">
-                        {usuario.nombre
-                          .split(" ")
-                          .map((n) => n[0])
-                          .slice(0, 2)
-                          .join("")}
-                      </div>
-
-                      {usuario.nombre}
-
+                <div className="donut-container">
+                  <div
+                    className="donut"
+                    style={{
+                      background: `conic-gradient(
+                        #2563eb 0% ${porcentaje(totalMasaje, totalRepetidores || 1)}%,
+                        #7c3aed ${porcentaje(totalMasaje, totalRepetidores || 1)}% ${(porcentaje(totalMasaje, totalRepetidores || 1) + porcentaje(totalSpa, totalRepetidores || 1))}%,
+                        #059669 ${(porcentaje(totalMasaje, totalRepetidores || 1) + porcentaje(totalSpa, totalRepetidores || 1))}% ${(porcentaje(totalMasaje, totalRepetidores || 1) + porcentaje(totalSpa, totalRepetidores || 1) + porcentaje(totalRepetidores, totalRepetidores || 1))}%,
+                        #f59e0b ${(porcentaje(totalMasaje, totalRepetidores || 1) + porcentaje(totalSpa, totalRepetidores || 1) + porcentaje(totalRepetidores, totalRepetidores || 1))}% 100%
+                      )`,
+                    }}
+                  >
+                    <div>
+                      <strong>{totalRepetidores}</strong>
+                      <span>Repetidores</span>
                     </div>
-                  </td>
+                  </div>
+                </div>
 
-                  <td>{usuario.genero}</td>
+                <div className="legend">
+                  <Legend color="#2563eb" label="Masajes" value={totalMasaje} />
+                  <Legend color="#7c3aed" label="Spa" value={totalSpa} />
+                  <Legend color="#059669" label="Mujeres" value={totalMujeres} />
+                  <Legend color="#f59e0b" label="Hombres" value={totalHombres} />
+                </div>
+              </div>
+            </section>
 
-                  <td>{usuario.edad}</td>
+            <section className="card table-card" id="usuarios">
+              <div className="card-title table-header">
+                <div>
+                  <h2>Usuarios</h2>
+                  <p>Detalle de empleados repetidores.</p>
+                </div>
 
-                  <td>{usuario.departamento}</td>
+                <span className="counter">{totalVista} registros</span>
+              </div>
 
-      
+              <div className="table-container">
+                {loading ? (
+                  <p className="empty">Cargando usuarios...</p>
+                ) : error ? (
+                  <p className="empty">{error}</p>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Género</th>
+                        <th>Edad</th>
+                      </tr>
+                    </thead>
 
-                  <td>
-                    <span
-                      className={`category ${categoria
-                        .toLowerCase()
-                        .replace("ó", "o")}`}
-                    >
-                      {categoria}
-                    </span>
-                  </td>
+                    <tbody>
+                      {usuariosFiltrados.map((usuario) => (
+                        <tr key={usuario.id}>
+                          <td>
+                            <strong>#{usuario.id}</strong>
+                          </td>
 
-                  {/* <td>{usuario.fecha || "N/A"}</td> */}
+                          <td>
+                            <div className="user-cell">
+                              <div className="small-avatar">
+                                {obtenerNombreCompleto(usuario)
+                                  .split(" ")
+                                  .map((nombre) => nombre[0])
+                                  .slice(0, 2)
+                                  .join("")
+                                  .toUpperCase()}
+                              </div>
+                              {obtenerNombreCompleto(usuario)}
+                            </div>
+                          </td>
 
-                </tr>
-              );
-            })}
+                          <td>{formatearGenero(usuario.genero)}</td>
+                          <td>{usuario.edad ?? "N/A"}</td>
+                        </tr>
+                      ))}
 
-            {usuariosFiltrados.length === 0 && (
-              <tr>
-                <td colSpan={8} className="empty">
-                  No se encontraron usuarios
-                  con los filtros seleccionados.
-                </td>
-              </tr>
-            )}
+                      {usuariosFiltrados.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="empty">
+                            No se encontraron usuarios con los filtros seleccionados.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </section>
+          </div>
 
-          </tbody>
+          <aside className="filters-sidebar">
+            <section className="filters-card">
+              <div className="filter-header">
+                <div>
+                  <h2>Filtros</h2>
+                  <span>Personaliza los resultados.</span>
+                </div>
 
-        </table>
+                <button className="clear-button" onClick={limpiarFiltros}>
+                  Limpiar
+                </button>
+              </div>
 
-      </div>
+              <div className="filters">
+                <div className="filter">
+                  <label>Género</label>
+                  <select value={filtros.genero} onChange={(e) => actualizarFiltro("genero", e.target.value)}>
+                    <option value="">Todos</option>
+                    <option value="Femenino">Femenino</option>
+                    <option value="Masculino">Masculino</option>
+                  </select>
+                </div>
 
-    </section>
+                <div className="filter">
+                  <label>Rango de edad</label>
+                  <select value={filtros.rangoEdad} onChange={(e) => actualizarFiltro("rangoEdad", e.target.value)}>
+                    <option value="">Todas las edades</option>
+                    <option value="18-25">18 - 25</option>
+                    <option value="26-35">26 - 35</option>
+                    <option value="36-45">36 - 45</option>
+                    <option value="46-55">46 - 55</option>
+                    <option value="56+">56+</option>
+                  </select>
+                </div>
 
-  </div>
+                <div className="filter">
+                  <label>ID de usuario</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. 1001"
+                    value={filtros.idUsuario}
+                    onChange={(e) => actualizarFiltro("idUsuario", e.target.value)}
+                  />
+                </div>
+              </div>
+            </section>
 
+            <div className="results-info">
+              <span>
+                Mostrando <strong>{totalVista}</strong> usuarios
+              </span>
 
-  {/* =========================================
-      FILTROS — DERECHA
-  ========================================= */}
-
-  <aside className="filters-sidebar">
-
-    <section className="filters-card">
-
-      <div className="filter-header">
-
-        <div>
-          <h2>Filtros</h2>
-
-          <span>
-            Personaliza los resultados.
-          </span>
+              {(filtros.genero || filtros.rangoEdad || filtros.idUsuario) && (
+                <span className="filtered">● Filtros activos</span>
+              )}
+            </div>
+          </aside>
         </div>
-
-        <button
-          className="clear-button"
-          onClick={limpiarFiltros}
-        >
-          Limpiar
-        </button>
-
-      </div>
-
-
-      <div className="filters">
-
-        <div className="filter">
-
-          <label>Género</label>
-
-          <select
-            value={filtros.genero}
-            onChange={(e) =>
-              actualizarFiltro(
-                "genero",
-                e.target.value
-              )
-            }
-          >
-            <option value="">Todos</option>
-            <option value="Femenino">
-              Femenino
-            </option>
-            <option value="Masculino">
-              Masculino
-            </option>
-          </select>
-
-        </div>
-
-
-        <div className="filter">
-
-          <label>Rango de edad</label>
-
-          <select
-            value={filtros.rangoEdad}
-            onChange={(e) =>
-              actualizarFiltro(
-                "rangoEdad",
-                e.target.value
-              )
-            }
-          >
-            <option value="">
-              Todas las edades
-            </option>
-
-            <option value="18-25">
-              18 - 25
-            </option>
-
-            <option value="26-35">
-              26 - 35
-            </option>
-
-            <option value="36-45">
-              36 - 45
-            </option>
-
-            <option value="46-55">
-              46 - 55
-            </option>
-
-            <option value="56+">
-              56+
-            </option>
-          </select>
-
-        </div>
-
-
-        <div className="filter">
-
-          <label>Departamento</label>
-
-          <select
-            value={filtros.departamento}
-            onChange={(e) =>
-              actualizarFiltro(
-                "departamento",
-                e.target.value
-              )
-            }
-          >
-            <option value="">Todos</option>
-
-            <option value="Recursos Humanos">
-              Recursos Humanos
-            </option>
-
-            <option value="Finanzas">
-              Finanzas
-            </option>
-
-            <option value="Tecnología">
-              Tecnología
-            </option>
-
-            <option value="Operaciones">
-              Operaciones
-            </option>
-          </select>
-
-        </div>
-
-
-        <div className="filter">
-
-          <label>ID de usuario</label>
-
-          <input
-            type="text"
-            placeholder="Ej. 1001"
-            value={filtros.idUsuario}
-            onChange={(e) =>
-              actualizarFiltro(
-                "idUsuario",
-                e.target.value
-              )
-            }
-          />
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    {/* RESULTADOS */}
-
-    <div className="results-info">
-
-      <span>
-        Mostrando <strong>{total}</strong> usuarios
-      </span>
-
-      {(filtros.genero ||
-        filtros.rangoEdad ||
-        filtros.departamento ||
-        filtros.idUsuario) && (
-
-        <span className="filtered">
-          ● Filtros activos
-        </span>
-
-      )}
-
-    </div>
-
-  </aside>
-
-</div>
-
-      
       </main>
     </div>
   );
@@ -782,40 +461,21 @@ type StatCardProps = {
   id?: string;
 };
 
-
-
-function StatCard({
-  title,
-  value,
-  percentage,
-  icon,
-  color,
-  id,
-}: StatCardProps) {
+function StatCard({ title, value, percentage, icon, color, id }: StatCardProps) {
   return (
-    <div
-      id={id}
-      className="stat-card"
-    >
-      <div className={`stat-icon ${color}`}>
-        {icon}
-      </div>
+    <div id={id} className="stat-card">
+      <div className={`stat-icon ${color}`}>{icon}</div>
 
       <div className="stat-content">
         <span>{title}</span>
 
-        <div className="stat-number">
-          {value}
-        </div>
+        <div className="stat-number">{value}</div>
 
-        <small>
-          {percentage}% del total
-        </small>
+        <small>{percentage}% del total</small>
       </div>
     </div>
   );
 }
-
 
 type BarProps = {
   label: string;
@@ -824,19 +484,8 @@ type BarProps = {
   color: string;
 };
 
-function Bar({
-  label,
-  value,
-  total,
-  color,
-}: BarProps) {
-  const width =
-    total > 0
-      ? Math.max(
-          (value / total) * 100,
-          value > 0 ? 4 : 0
-        )
-      : 0;
+function Bar({ label, value, total, color }: BarProps) {
+  const width = total > 0 ? Math.max((value / total) * 100, value > 0 ? 4 : 0) : 0;
 
   return (
     <div className="bar-row">
@@ -846,18 +495,11 @@ function Bar({
       </div>
 
       <div className="bar-background">
-        <div
-          className="bar-fill"
-          style={{
-            width: `${width}%`,
-            background: color,
-          }}
-        />
+        <div className="bar-fill" style={{ width: `${width}%`, background: color }} />
       </div>
     </div>
   );
 }
-
 
 type LegendProps = {
   color: string;
@@ -865,19 +507,11 @@ type LegendProps = {
   value: number;
 };
 
-function Legend({
-  color,
-  label,
-  value,
-}: LegendProps) {
+function Legend({ color, label, value }: LegendProps) {
   return (
     <div className="legend-item">
       <div className="legend-label">
-        <span
-          className="legend-dot"
-          style={{ background: color }}
-        />
-
+        <span className="legend-dot" style={{ background: color }} />
         {label}
       </div>
 
@@ -885,22 +519,5 @@ function Legend({
     </div>
   );
 }
-
-type StatusProps = {
-  activo: boolean;
-};
-
-function Status({ activo }: StatusProps) {
-  return activo ? (
-    <span className="status active">
-      ✓ Sí
-    </span>
-  ) : (
-    <span className="status inactive">
-      — No
-    </span>
-  );
-}
-
 
 export default Dashboard;
