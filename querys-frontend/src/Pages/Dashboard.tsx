@@ -5,27 +5,44 @@ type Filtros = {
   genero: string;
   rangoEdad: string;
   idUsuario: string;
+  tipo: string;
 };
 
-type Empleado = {
+type Usuario = {
   id: number;
   nombre?: string;
   apellido?: string;
   genero?: string;
   edad?: number;
+  tipo?: string;
 };
 
 type ResumenApi = {
-  total_personas?: number;
-  total_mujeres?: number;
-  total_hombres?: number;
-  total_masaje?: number;
-  total_spa?: number;
-  promedio?: number;
+  total_usuarios?: number;
+  usuarios_solo_masaje?: number;
+  pct_usuarios_solo_masaje?: number;
+  usuarios_solo_spa?: number;
+  pct_usuarios_solo_spa?: number;
+  usuarios_ambas?: number;
+  pct_usuarios_ambas?: number;
+  visitas_masaje?: number;
+  pct_visitas_masaje?: number;
+  visitas_spa?: number;
+  pct_visitas_spa?: number;
+  visitas_ambas?: number;
+  pct_visitas_ambas?: number;
+  total_visitas?: number;
 };
 
-type EdadApi = {
-  edad: number;
+type RangoEdadApi = {
+  rango: string;
+  orden?: number;
+  cantidad: number;
+  porcentaje: number;
+};
+
+type GeneroApi = {
+  genero: string;
   cantidad: number;
   porcentaje: number;
 };
@@ -35,8 +52,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 const normalizarGenero = (valor?: string) => {
   const genero = (valor ?? "").trim().toLowerCase();
 
-  if (["m", "h", "masculino", "hombre"].includes(genero)) return "masculino";
-  if (["f", "femenino", "mujer"].includes(genero)) return "femenino";
+  // En la BD: 'H' = hombre, 'M' = mujer
+  if (["h", "masculino", "hombre"].includes(genero)) return "masculino";
+  if (["m", "f", "femenino", "mujer"].includes(genero)) return "femenino";
 
   return genero;
 };
@@ -44,13 +62,21 @@ const normalizarGenero = (valor?: string) => {
 const formatearGenero = (valor?: string) => {
   const genero = (valor ?? "").trim();
 
-  if (["M", "H", "masculino", "Masculino"].includes(genero)) return "Masculino";
-  if (["F", "femenino", "Femenino"].includes(genero)) return "Femenino";
+  // En la BD: 'H' = hombre, 'M' = mujer
+  if (["H", "h", "masculino", "Masculino", "hombre", "Hombre"].includes(genero)) return "Masculino";
+  if (["M", "m", "F", "f", "femenino", "Femenino", "mujer", "Mujer"].includes(genero)) return "Femenino";
 
   return genero || "No especificado";
 };
 
-const obtenerNombreCompleto = (usuario: Empleado) => {
+const formatearTipo = (valor?: string) => {
+  if (valor === "solo_masaje") return "Solo masaje";
+  if (valor === "solo_spa") return "Solo spa";
+  if (valor === "ambas") return "Ambas";
+  return valor || "N/A";
+};
+
+const obtenerNombreCompleto = (usuario: Usuario) => {
   const nombre = (usuario.nombre ?? "").trim();
   const apellido = (usuario.apellido ?? "").trim();
 
@@ -59,55 +85,104 @@ const obtenerNombreCompleto = (usuario: Empleado) => {
   return `Empleado ${usuario.id}`;
 };
 
+// Rangos de 10 en 10: 20-29, 30-39, 40-49, 50-59
+const cumpleRangoEdad = (edad: number, rango: string) => {
+  const match = rango.match(/^(\d+)-(\d+)$/);
+  if (!match) return true;
+  const inicio = Number(match[1]);
+  const fin = Number(match[2]);
+  return edad >= inicio && edad <= fin;
+};
+
 function Dashboard() {
-  const [usuarios, setUsuarios] = useState<Empleado[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [resumen, setResumen] = useState<ResumenApi>({});
-  const [edades, setEdades] = useState<EdadApi[]>([]);
+  const [rangos, setRangos] = useState<RangoEdadApi[]>([]);
+  const [generos, setGeneros] = useState<GeneroApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filtros, setFiltros] = useState<Filtros>({
     genero: "",
     rangoEdad: "",
     idUsuario: "",
+    tipo: "",
   });
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   useEffect(() => {
     const cargarDashboard = async () => {
       try {
-        const [repetidoresRes, mujeresRes, hombresRes, totalRes, masajeRes, spaRes, edadesRes, promedioRes] =
-          await Promise.all([
-            fetch(`${API_BASE_URL}/services/repetidores`),
-            fetch(`${API_BASE_URL}/services/repetidores/mujeres`),
-            fetch(`${API_BASE_URL}/services/repetidores/hombres`),
-            fetch(`${API_BASE_URL}/services/repetidores/total`),
-            fetch(`${API_BASE_URL}/services/masaje/total`),
-            fetch(`${API_BASE_URL}/services/spa/total`),
-            fetch(`${API_BASE_URL}/services/repetidores/edades`),
-            fetch(`${API_BASE_URL}/services/repetidores/promedio-edad`),
-          ]);
-
-        const [repetidores, mujeres, hombres, total, masaje, spa, edadesData, promedio] = await Promise.all([
-          repetidoresRes.json(),
-          mujeresRes.json(),
-          hombresRes.json(),
-          totalRes.json(),
-          masajeRes.json(),
-          spaRes.json(),
-          edadesRes.json(),
-          promedioRes.json(),
+        const [
+          totalUsuariosRes,
+          totalVisitasRes,
+          soloMasajeRes,
+          visitasMasajeRes,
+          soloSpaRes,
+          visitasSpaRes,
+          ambasUsuariosRes,
+          ambasVisitasRes,
+          rangosRes,
+          generosRes,
+          usuariosRes,
+        ] = await Promise.all([
+          fetch(`${API_BASE_URL}/services/usuarios/total`),
+          fetch(`${API_BASE_URL}/services/visitas/total`),
+          fetch(`${API_BASE_URL}/services/masaje/usuarios-solo`),
+          fetch(`${API_BASE_URL}/services/masaje/total`),
+          fetch(`${API_BASE_URL}/services/spa/usuarios-solo`),
+          fetch(`${API_BASE_URL}/services/spa/total`),
+          fetch(`${API_BASE_URL}/services/repetidores/total`),
+          fetch(`${API_BASE_URL}/services/ambas/visitas`),
+          fetch(`${API_BASE_URL}/services/edades/rangos`),
+          fetch(`${API_BASE_URL}/services/genero/distribucion`),
+          fetch(`${API_BASE_URL}/services/usuarios`),
         ]);
 
-        setUsuarios(Array.isArray(repetidores) ? repetidores : []);
+        const [
+          totalUsuariosData,
+          totalVisitasData,
+          soloMasajeData,
+          visitasMasajeData,
+          soloSpaData,
+          visitasSpaData,
+          ambasUsuariosData,
+          ambasVisitasData,
+          rangosData,
+          generosData,
+          usuariosData,
+        ] = await Promise.all([
+          totalUsuariosRes.json(),
+          totalVisitasRes.json(),
+          soloMasajeRes.json(),
+          visitasMasajeRes.json(),
+          soloSpaRes.json(),
+          visitasSpaRes.json(),
+          ambasUsuariosRes.json(),
+          ambasVisitasRes.json(),
+          rangosRes.json(),
+          generosRes.json(),
+          usuariosRes.json(),
+        ]);
+
         setResumen({
-          total_personas: Number(total?.total_personas ?? repetidores?.length ?? 0),
-          total_mujeres: Number(mujeres?.total_mujeres ?? 0),
-          total_hombres: Number(hombres?.total_hombres ?? 0),
-          total_masaje: Number(masaje?.total_masaje ?? 0),
-          total_spa: Number(spa?.total_spa ?? 0),
-          promedio: Number(promedio?.promedio ?? 0),
+          total_usuarios: Number(totalUsuariosData?.total_usuarios ?? 0),
+          total_visitas: Number(totalVisitasData?.total_visitas ?? 0),
+          usuarios_solo_masaje: Number(soloMasajeData?.usuarios_solo_masaje ?? 0),
+          pct_usuarios_solo_masaje: Number(soloMasajeData?.porcentaje ?? 0),
+          visitas_masaje: Number(visitasMasajeData?.visitas_masaje ?? 0),
+          pct_visitas_masaje: Number(visitasMasajeData?.porcentaje ?? 0),
+          usuarios_solo_spa: Number(soloSpaData?.usuarios_solo_spa ?? 0),
+          pct_usuarios_solo_spa: Number(soloSpaData?.porcentaje ?? 0),
+          visitas_spa: Number(visitasSpaData?.visitas_spa ?? 0),
+          pct_visitas_spa: Number(visitasSpaData?.porcentaje ?? 0),
+          usuarios_ambas: Number(ambasUsuariosData?.usuarios_ambas ?? 0),
+          pct_usuarios_ambas: Number(ambasUsuariosData?.porcentaje ?? 0),
+          visitas_ambas: Number(ambasVisitasData?.visitas_ambas ?? 0),
+          pct_visitas_ambas: Number(ambasVisitasData?.porcentaje ?? 0),
         });
-        setEdades(Array.isArray(edadesData) ? edadesData : []);
+        setRangos(Array.isArray(rangosData) ? rangosData : []);
+        setGeneros(Array.isArray(generosData) ? generosData : []);
+        setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
       } catch (err) {
         console.error(err);
         setError("No se pudo cargar la información del dashboard.");
@@ -128,6 +203,7 @@ function Dashboard() {
       genero: "",
       rangoEdad: "",
       idUsuario: "",
+      tipo: "",
     });
   };
 
@@ -140,6 +216,10 @@ function Dashboard() {
         return false;
       }
 
+      if (filtros.tipo && (usuario.tipo ?? "") !== filtros.tipo) {
+        return false;
+      }
+
       if (filtros.idUsuario) {
         const idUsuario = String(usuario.id ?? "");
         if (!idUsuario.toLowerCase().includes(filtros.idUsuario.toLowerCase())) {
@@ -149,12 +229,7 @@ function Dashboard() {
 
       if (filtros.rangoEdad) {
         const edad = Number(usuario.edad ?? 0);
-
-        if (filtros.rangoEdad === "18-25" && !(edad >= 18 && edad <= 25)) return false;
-        if (filtros.rangoEdad === "26-35" && !(edad >= 26 && edad <= 35)) return false;
-        if (filtros.rangoEdad === "36-45" && !(edad >= 36 && edad <= 45)) return false;
-        if (filtros.rangoEdad === "46-55" && !(edad >= 46 && edad <= 55)) return false;
-        if (filtros.rangoEdad === "56+" && edad < 56) return false;
+        if (!cumpleRangoEdad(edad, filtros.rangoEdad)) return false;
       }
 
       return true;
@@ -162,19 +237,19 @@ function Dashboard() {
   }, [filtros, usuarios]);
 
   const totalVista = usuariosFiltrados.length;
-  const totalRepetidores = Number(resumen.total_personas ?? usuarios.length ?? 0);
-  const totalMasaje = Number(resumen.total_masaje ?? 0);
-  const totalSpa = Number(resumen.total_spa ?? 0);
-  const totalMujeres = Number(resumen.total_mujeres ?? 0);
-  const totalHombres = Number(resumen.total_hombres ?? 0);
-  const promedioEdad = Number(resumen.promedio ?? 0);
+  const num = (valor?: number) => Number(valor ?? 0);
 
-  const porcentaje = (cantidad: number, base: number) => {
-    if (!base) return 0;
-    return Math.round((cantidad / base) * 100);
-  };
+  const totalUsuarios = num(resumen.total_usuarios ?? usuarios.length);
+  const totalVisitas = num(resumen.total_visitas);
 
-  const maxEdad = edades.reduce((max, item) => Math.max(max, Number(item.cantidad ?? 0)), 0);
+  const maxRango = rangos.reduce((max, item) => Math.max(max, Number(item.cantidad ?? 0)), 0);
+  const maxGenero = generos.reduce((max, item) => Math.max(max, Number(item.cantidad ?? 0)), 0);
+
+  const colorGenero = (genero: string) => genero === "Femenino" ? "#7c3aed" : genero === "Masculino" ? "#2563eb" : "#98a2b3";
+
+  const pctSoloMasaje = num(resumen.pct_usuarios_solo_masaje);
+  const pctSoloSpa = num(resumen.pct_usuarios_solo_spa);
+  const pctAmbas = num(resumen.pct_usuarios_ambas);
 
   return (
     <div className="app">
@@ -235,35 +310,67 @@ function Dashboard() {
           <div className="dashboard-content">
             <section className="stats">
               <StatCard
-                title="Masajes"
-                value={totalMasaje}
-                percentage={porcentaje(totalMasaje, totalRepetidores || 1)}
+                title="Total usuarios"
+                value={totalUsuarios}
+                subtitle="Todos los usuarios"
+                icon="👥"
+                color="orange"
+              />
+
+              <StatCard
+                title="Total visitas"
+                value={totalVisitas}
+                subtitle="Todas las visitas"
+                icon="📊"
+                color="orange"
+              />
+
+              <StatCard
+                title="Usuarios solo masajes"
+                value={num(resumen.usuarios_solo_masaje)}
+                subtitle={`${pctSoloMasaje}% de los usuarios`}
                 icon="💆"
                 color="blue"
               />
 
               <StatCard
-                title="Spa"
-                value={totalSpa}
-                percentage={porcentaje(totalSpa, totalRepetidores || 1)}
+                title="Visitas a masajes"
+                value={num(resumen.visitas_masaje)}
+                subtitle={`${num(resumen.pct_visitas_masaje)}% de las visitas`}
+                icon="💆‍♀️"
+                color="blue"
+              />
+
+              <StatCard
+                title="Usuarios solo spa"
+                value={num(resumen.usuarios_solo_spa)}
+                subtitle={`${pctSoloSpa}% de los usuarios`}
                 icon="🧖"
                 color="purple"
               />
 
               <StatCard
-                title="Repetidores"
-                value={totalRepetidores}
-                percentage={porcentaje(totalRepetidores, totalRepetidores || 1)}
+                title="Visitas a spa"
+                value={num(resumen.visitas_spa)}
+                subtitle={`${num(resumen.pct_visitas_spa)}% de las visitas`}
+                icon="🧖‍♀️"
+                color="purple"
+              />
+
+              <StatCard
+                title="Usuarios ambas"
+                value={num(resumen.usuarios_ambas)}
+                subtitle={`${pctAmbas}% de los usuarios`}
                 icon="🔄"
                 color="green"
               />
 
               <StatCard
-                title="Promedio edad"
-                value={Number(promedioEdad.toFixed(2))}
-                percentage={porcentaje(Math.round(promedioEdad), totalRepetidores || 1)}
-                icon="📈"
-                color="orange"
+                title="Visitas ambas"
+                value={num(resumen.visitas_ambas)}
+                subtitle={`${num(resumen.pct_visitas_ambas)}% de las visitas`}
+                icon="♻️"
+                color="green"
               />
             </section>
 
@@ -272,17 +379,46 @@ function Dashboard() {
                 <div className="card-title">
                   <div>
                     <h2>Distribución por edad</h2>
-                    <p>Participación de empleados repetidores por grupo etario.</p>
+                    <p>Rangos de 10 años sobre todos los usuarios.</p>
                   </div>
                 </div>
 
                 <div className="chart">
-                  {edades.length > 0 ? (
-                    edades.map((item) => (
-                      <Bar key={item.edad} label={`Edad ${item.edad}`} value={item.cantidad} total={maxEdad || 1} color="#2563eb" />
+                  {rangos.length > 0 ? (
+                    rangos.map((item) => (
+                      <Bar
+                        key={item.rango}
+                        label={`${item.rango} años (${Number(item.porcentaje ?? 0)}%)`}
+                        value={item.cantidad}
+                        total={maxRango || 1}
+                        color="#2563eb"
+                      />
                     ))
                   ) : (
                     <p className="empty">No hay datos de edad disponibles.</p>
+                  )}
+                </div>
+
+                <div className="card-title" style={{ marginTop: "28px", marginBottom: "16px" }}>
+                  <div>
+                    <h2>Distribución por género</h2>
+                    <p>Participación sobre todos los usuarios.</p>
+                  </div>
+                </div>
+
+                <div className="chart">
+                  {generos.length > 0 ? (
+                    generos.map((item) => (
+                      <Bar
+                        key={item.genero}
+                        label={`${item.genero} (${Number(item.porcentaje ?? 0)}%)`}
+                        value={item.cantidad}
+                        total={maxGenero || 1}
+                        color={colorGenero(item.genero)}
+                      />
+                    ))
+                  ) : (
+                    <p className="empty">No hay datos de género disponibles.</p>
                   )}
                 </div>
               </div>
@@ -291,7 +427,7 @@ function Dashboard() {
                 <div className="card-title">
                   <div>
                     <h2>Resumen</h2>
-                    <p>Datos generales</p>
+                    <p>Distribución de usuarios</p>
                   </div>
                 </div>
 
@@ -300,25 +436,36 @@ function Dashboard() {
                     className="donut"
                     style={{
                       background: `conic-gradient(
-                        #2563eb 0% ${porcentaje(totalMasaje, totalRepetidores || 1)}%,
-                        #7c3aed ${porcentaje(totalMasaje, totalRepetidores || 1)}% ${(porcentaje(totalMasaje, totalRepetidores || 1) + porcentaje(totalSpa, totalRepetidores || 1))}%,
-                        #059669 ${(porcentaje(totalMasaje, totalRepetidores || 1) + porcentaje(totalSpa, totalRepetidores || 1))}% ${(porcentaje(totalMasaje, totalRepetidores || 1) + porcentaje(totalSpa, totalRepetidores || 1) + porcentaje(totalRepetidores, totalRepetidores || 1))}%,
-                        #f59e0b ${(porcentaje(totalMasaje, totalRepetidores || 1) + porcentaje(totalSpa, totalRepetidores || 1) + porcentaje(totalRepetidores, totalRepetidores || 1))}% 100%
+                        #2563eb 0% ${pctSoloMasaje}%,
+                        #7c3aed ${pctSoloMasaje}% ${pctSoloMasaje + pctSoloSpa}%,
+                        #059669 ${pctSoloMasaje + pctSoloSpa}% 100%
                       )`,
                     }}
                   >
                     <div>
-                      <strong>{totalRepetidores}</strong>
-                      <span>Repetidores</span>
+                      <strong>{totalUsuarios}</strong>
+                      <span>Usuarios</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="legend">
-                  <Legend color="#2563eb" label="Masajes" value={totalMasaje} />
-                  <Legend color="#7c3aed" label="Spa" value={totalSpa} />
-                  <Legend color="#059669" label="Mujeres" value={totalMujeres} />
-                  <Legend color="#f59e0b" label="Hombres" value={totalHombres} />
+                  <Legend
+                    color="#2563eb"
+                    label={`Solo masajes (${pctSoloMasaje}%)`}
+                    value={num(resumen.usuarios_solo_masaje)}
+                  />
+                  <Legend
+                    color="#7c3aed"
+                    label={`Solo spa (${pctSoloSpa}%)`}
+                    value={num(resumen.usuarios_solo_spa)}
+                  />
+                  <Legend
+                    color="#059669"
+                    label={`Ambas (${pctAmbas}%)`}
+                    value={num(resumen.usuarios_ambas)}
+                  />
+                  <Legend color="#f59e0b" label="Total visitas" value={totalVisitas} />
                 </div>
               </div>
             </section>
@@ -327,7 +474,7 @@ function Dashboard() {
               <div className="card-title table-header">
                 <div>
                   <h2>Usuarios</h2>
-                  <p>Detalle de empleados repetidores.</p>
+                  <p>Detalle de todos los usuarios que visitaron masaje o spa.</p>
                 </div>
 
                 <span className="counter">{totalVista} registros</span>
@@ -346,6 +493,7 @@ function Dashboard() {
                         <th>Usuario</th>
                         <th>Género</th>
                         <th>Edad</th>
+                        <th>Servicio</th>
                       </tr>
                     </thead>
 
@@ -372,12 +520,13 @@ function Dashboard() {
 
                           <td>{formatearGenero(usuario.genero)}</td>
                           <td>{usuario.edad ?? "N/A"}</td>
+                          <td>{formatearTipo(usuario.tipo)}</td>
                         </tr>
                       ))}
 
                       {usuariosFiltrados.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="empty">
+                          <td colSpan={5} className="empty">
                             No se encontraron usuarios con los filtros seleccionados.
                           </td>
                         </tr>
@@ -404,6 +553,16 @@ function Dashboard() {
 
               <div className="filters">
                 <div className="filter">
+                  <label>Servicio</label>
+                  <select value={filtros.tipo} onChange={(e) => actualizarFiltro("tipo", e.target.value)}>
+                    <option value="">Todos</option>
+                    <option value="solo_masaje">Solo masaje</option>
+                    <option value="solo_spa">Solo spa</option>
+                    <option value="ambas">Ambas</option>
+                  </select>
+                </div>
+
+                <div className="filter">
                   <label>Género</label>
                   <select value={filtros.genero} onChange={(e) => actualizarFiltro("genero", e.target.value)}>
                     <option value="">Todos</option>
@@ -416,11 +575,10 @@ function Dashboard() {
                   <label>Rango de edad</label>
                   <select value={filtros.rangoEdad} onChange={(e) => actualizarFiltro("rangoEdad", e.target.value)}>
                     <option value="">Todas las edades</option>
-                    <option value="18-25">18 - 25</option>
-                    <option value="26-35">26 - 35</option>
-                    <option value="36-45">36 - 45</option>
-                    <option value="46-55">46 - 55</option>
-                    <option value="56+">56+</option>
+                    <option value="20-29">20 - 29</option>
+                    <option value="30-39">30 - 39</option>
+                    <option value="40-49">40 - 49</option>
+                    <option value="50-59">50 - 59</option>
                   </select>
                 </div>
 
@@ -441,7 +599,7 @@ function Dashboard() {
                 Mostrando <strong>{totalVista}</strong> usuarios
               </span>
 
-              {(filtros.genero || filtros.rangoEdad || filtros.idUsuario) && (
+              {(filtros.genero || filtros.rangoEdad || filtros.idUsuario || filtros.tipo) && (
                 <span className="filtered">● Filtros activos</span>
               )}
             </div>
@@ -455,13 +613,13 @@ function Dashboard() {
 type StatCardProps = {
   title: string;
   value: number;
-  percentage: number;
+  subtitle: string;
   icon: string;
   color: string;
   id?: string;
 };
 
-function StatCard({ title, value, percentage, icon, color, id }: StatCardProps) {
+function StatCard({ title, value, subtitle, icon, color, id }: StatCardProps) {
   return (
     <div id={id} className="stat-card">
       <div className={`stat-icon ${color}`}>{icon}</div>
@@ -471,7 +629,7 @@ function StatCard({ title, value, percentage, icon, color, id }: StatCardProps) 
 
         <div className="stat-number">{value}</div>
 
-        <small>{percentage}% del total</small>
+        <small>{subtitle}</small>
       </div>
     </div>
   );

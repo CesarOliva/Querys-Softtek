@@ -5,59 +5,84 @@ const router = express.Router();
 const dashBoardController = require('../controllers/dashboardController');
 
 
-// Todos los empleados que fueron a ambos servicios
+// Cantidad total de TODOS los usuarios (visitaron masaje o spa)
 router.get(
-    '/services/repetidores',
-    dashBoardController.getTodosLosEmpleadosRepetidores
+    '/services/usuarios/total',
+    dashBoardController.getTotalUsers
 );
 
 
-// Cantidad de mujeres que fueron a ambos servicios
+// Cantidad total de TODAS las visitas (masaje + spa)
 router.get(
-    '/services/repetidores/mujeres',
-    dashBoardController.getMujeresRepetidores
+    '/services/visitas/total',
+    dashBoardController.getTotalVisits
 );
 
 
-// Cantidad de hombres que fueron a ambos servicios
+// Usuarios que visitan únicamente masajes + % frente a usuarios totales
 router.get(
-    '/services/repetidores/hombres',
-    dashBoardController.getHombresRepetidores
+    '/services/masaje/usuarios-solo',
+    dashBoardController.getUsersOnlyMassage
 );
 
 
-// Cantidad total de empleados que fueron a ambos servicios
-router.get(
-    '/services/repetidores/total',
-    dashBoardController.getTotalRepetidores
-);
-
-
-// Cantidad de empleados que fueron a masaje
+// Cantidad total de visitas a masajes + % frente a visitas totales
+// (reutilizada: antes contaba usuarios distintos, sin uso en el front)
 router.get(
     '/services/masaje/total',
-    dashBoardController.getTotalMasaje
+    dashBoardController.getVisitsMassage
 );
 
 
-// Cantidad de empleados que fueron al spa
+// Usuarios que visitan únicamente spa + % frente a usuarios totales
+router.get(
+    '/services/spa/usuarios-solo',
+    dashBoardController.getUsersOnlySpa
+);
+
+
+// Cantidad total de visitas a spa + % frente a visitas totales
+// (reutilizada: antes contaba usuarios distintos, sin uso en el front)
 router.get(
     '/services/spa/total',
-    dashBoardController.getTotalSpa
+    dashBoardController.getVisitsSpa
 );
 
 
-// Distribución de edades de empleados que fueron a ambos servicios
+// Usuarios que visitan ambas + % frente a usuarios totales
+// (reutilizada: antes contaba solo coincidencias de la misma semana,
+// sin uso en el front)
 router.get(
-    '/services/repetidores/edades',
-    dashBoardController.getRepetidoresPorEdad
+    '/services/repetidores/total',
+    dashBoardController.getUsersBoth
 );
 
 
-// Promedio de edad de empleados que fueron a ambos servicios
+// Cantidad total de visitas a ambas + % frente a visitas totales
 router.get(
-    '/services/repetidores/promedio-edad',
-    dashBoardController.getPromedioEdad
+    '/services/ambas/visitas',
+    dashBoardController.getVisitsBoth
+);
+
+
+// Distribución por rangos de edad de 10 en 10 (todos los usuarios)
+router.get(
+    '/services/edades/rangos',
+    dashBoardController.getEdadesRangos
+);
+
+
+// Distribución por género (todos los usuarios)
+router.get(
+    '/services/genero/distribucion',
+    dashBoardController.getGeneroDistribucion
+);
+
+
+// Todos los usuarios con su tipo (solo_masaje | solo_spa | ambas)
+router.get(
+    '/services/usuarios',
+    dashBoardController.getUsuariosConTipo
 );
 
 
