@@ -34,17 +34,27 @@ type ResumenApi = {
   total_visitas?: number;
 };
 
-type RangoEdadApi = {
+type RangoEdad = {
   rango: string;
-  orden?: number;
+  orden: number;
   cantidad: number;
   porcentaje: number;
 };
 
-type GeneroApi = {
+type GeneroAgrupado = {
   genero: string;
   cantidad: number;
   porcentaje: number;
+};
+
+type EdadCrudaApi = {
+  id: number;
+  edad: number;
+};
+
+type GeneroCrudoApi = {
+  id: number;
+  genero: string;
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -72,7 +82,8 @@ const formatearGenero = (valor?: string) => {
 const formatearTipo = (valor?: string) => {
   if (valor === "solo_masaje") return "Solo masaje";
   if (valor === "solo_spa") return "Solo spa";
-  if (valor === "ambas") return "Ambas";
+  if (valor === "ambas") return "Ambas (misma semana)";
+  if (valor === "mixto") return "Mixto (distinta semana)";
   return valor || "N/A";
 };
 
@@ -97,8 +108,8 @@ const cumpleRangoEdad = (edad: number, rango: string) => {
 function Dashboard() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [resumen, setResumen] = useState<ResumenApi>({});
-  const [rangos, setRangos] = useState<RangoEdadApi[]>([]);
-  const [generos, setGeneros] = useState<GeneroApi[]>([]);
+  const [edades, setEdades] = useState<EdadCrudaApi[]>([]);
+  const [generosCrudos, setGenerosCrudos] = useState<GeneroCrudoApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filtros, setFiltros] = useState<Filtros>({
@@ -121,7 +132,7 @@ function Dashboard() {
           visitasSpaRes,
           ambasUsuariosRes,
           ambasVisitasRes,
-          rangosRes,
+          edadesRes,
           generosRes,
           usuariosRes,
         ] = await Promise.all([
@@ -133,8 +144,8 @@ function Dashboard() {
           fetch(`${API_BASE_URL}/services/spa/total`),
           fetch(`${API_BASE_URL}/services/repetidores/total`),
           fetch(`${API_BASE_URL}/services/ambas/visitas`),
-          fetch(`${API_BASE_URL}/services/edades/rangos`),
-          fetch(`${API_BASE_URL}/services/genero/distribucion`),
+          fetch(`${API_BASE_URL}/services/edades`),
+          fetch(`${API_BASE_URL}/services/genero`),
           fetch(`${API_BASE_URL}/services/usuarios`),
         ]);
 
@@ -147,7 +158,7 @@ function Dashboard() {
           visitasSpaData,
           ambasUsuariosData,
           ambasVisitasData,
-          rangosData,
+          edadesData,
           generosData,
           usuariosData,
         ] = await Promise.all([
@@ -159,7 +170,7 @@ function Dashboard() {
           visitasSpaRes.json(),
           ambasUsuariosRes.json(),
           ambasVisitasRes.json(),
-          rangosRes.json(),
+          edadesRes.json(),
           generosRes.json(),
           usuariosRes.json(),
         ]);
@@ -198,8 +209,8 @@ function Dashboard() {
             Number(totalVisitasData?.total_visitas ?? 0)
           ),
         });
-        setRangos(Array.isArray(rangosData) ? rangosData : []);
-        setGeneros(Array.isArray(generosData) ? generosData : []);
+        setEdades(Array.isArray(edadesData) ? edadesData : []);
+        setGenerosCrudos(Array.isArray(generosData) ? generosData : []);
         setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
       } catch (err) {
         console.error(err);
@@ -263,6 +274,44 @@ function Dashboard() {
 
   const totalUsuarios = num(resumen.total_usuarios ?? usuarios.length);
   const totalVisitas = num(resumen.total_visitas);
+
+  // Distribución por rangos de 10 en 10 desde las edades crudas
+  const rangos: RangoEdad[] = useMemo(() => {
+    const grupos = new Map<number, number>();
+
+    edades.forEach(({ edad }) => {
+      if (edad == null) return;
+      const base = Math.floor(Number(edad) / 10) * 10;
+      grupos.set(base, (grupos.get(base) ?? 0) + 1);
+    });
+
+    return [...grupos.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([base, cantidad]) => ({
+        rango: `${base}-${base + 9}`,
+        orden: base,
+        cantidad,
+        porcentaje: pct(cantidad, totalUsuarios),
+      }));
+  }, [edades, totalUsuarios]);
+
+  // Distribución por género desde los géneros crudos ('H'/'M')
+  const generos: GeneroAgrupado[] = useMemo(() => {
+    const grupos = new Map<string, number>();
+
+    generosCrudos.forEach(({ genero }) => {
+      const clave = formatearGenero(genero);
+      grupos.set(clave, (grupos.get(clave) ?? 0) + 1);
+    });
+
+    return [...grupos.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([genero, cantidad]) => ({
+        genero,
+        cantidad,
+        porcentaje: pct(cantidad, totalUsuarios),
+      }));
+  }, [generosCrudos, totalUsuarios]);
 
   const maxRango = rangos.reduce((max, item) => Math.max(max, Number(item.cantidad ?? 0)), 0);
   const maxGenero = generos.reduce((max, item) => Math.max(max, Number(item.cantidad ?? 0)), 0);
@@ -460,7 +509,8 @@ function Dashboard() {
                       background: `conic-gradient(
                         #2563eb 0% ${pctSoloMasaje}%,
                         #7c3aed ${pctSoloMasaje}% ${pctSoloMasaje + pctSoloSpa}%,
-                        #059669 ${pctSoloMasaje + pctSoloSpa}% 100%
+                        #059669 ${pctSoloMasaje + pctSoloSpa}% ${pctSoloMasaje + pctSoloSpa + pctAmbas}%,
+                        #eaecf0 ${pctSoloMasaje + pctSoloSpa + pctAmbas}% 100%
                       )`,
                     }}
                   >
@@ -486,6 +536,16 @@ function Dashboard() {
                     color="#059669"
                     label={`Ambas (${pctAmbas}%)`}
                     value={num(resumen.usuarios_ambas)}
+                  />
+                  <Legend
+                    color="#eaecf0"
+                    label="Mixto (distinta semana)"
+                    value={
+                      totalUsuarios -
+                      num(resumen.usuarios_solo_masaje) -
+                      num(resumen.usuarios_solo_spa) -
+                      num(resumen.usuarios_ambas)
+                    }
                   />
                   <Legend color="#f59e0b" label="Total visitas" value={totalVisitas} />
                 </div>
@@ -580,7 +640,8 @@ function Dashboard() {
                     <option value="">Todos</option>
                     <option value="solo_masaje">Solo masaje</option>
                     <option value="solo_spa">Solo spa</option>
-                    <option value="ambas">Ambas</option>
+                    <option value="ambas">Ambas (misma semana)</option>
+                    <option value="mixto">Mixto (distinta semana)</option>
                   </select>
                 </div>
 

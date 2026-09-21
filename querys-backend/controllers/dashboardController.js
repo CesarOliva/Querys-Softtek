@@ -1,11 +1,14 @@
 const pool = require('../db');
 
-// - solo_masaje: usuarios en Masaje pero NUNCA en Spa
-// - solo_spa: usuarios en Spa pero NUNCA en Masaje
-// - ambas: usuarios en AMBOS servicios alguna vez (intersección)
-// - total_usuarios: UNION de ambos (solo_masaje + solo_spa + ambas = total)
+// Definiciones (cada semana hay dos servicios: Spa y Masaje):
+// - solo_masaje: usuarios en Masaje pero NUNCA en Spa (estricto)
+// - solo_spa: usuarios en Spa pero NUNCA en Masaje (estricto)
+// - ambas: usuarios que fueron a AMBOS servicios ALGUNA VEZ EN LA MISMA
+//   SEMANA (vista_empleados_tramposos, YEARWEEK)
+// - total_usuarios: UNION de ambos (incluye usuarios "mixtos": fueron a ambos
+//   pero nunca la misma semana, fuera de las 3 categorías)
 // - visitas_masaje / visitas_spa: COUNT(*) de cada tabla
-// - visitas_ambas: visitas (masaje + spa) hechas por usuarios que visitaron AMBOS
+// - visitas_ambas: filas de la vista (pares masaje+spa misma semana)
 // - total_visitas: visitas_masaje + visitas_spa
 
 
@@ -120,14 +123,12 @@ const getVisitsSpa = async (req, res) => {
 };
 
 
-//Usuarios que visitan ambas.
+//Usuarios que fueron a ambas ALGUNA VEZ EN LA MISMA SEMANA.
 const getUsersBoth = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT COUNT(*) AS usuarios_ambas
-            FROM (SELECT DISTINCT id_empleado AS id FROM Masaje) AS usuarios_masaje
-            INNER JOIN (SELECT DISTINCT id_empleado AS id FROM Spa) AS usuarios_spa
-            ON usuarios_spa.id = usuarios_masaje.id
+            SELECT COUNT(DISTINCT id) AS usuarios_ambas
+            FROM vista_empleados_tramposos
         `);
 
         res.json(rows[0]);
@@ -139,20 +140,12 @@ const getUsersBoth = async (req, res) => {
 };
 
 
-//Cantidad total de visitas a ambas (masaje + spa de quienes visitaron ambos).
+//Cantidad total de visitas a ambas en la misma semana
 const getVisitsBoth = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            WITH ambas AS (
-                SELECT usuarios_masaje.id
-                FROM (SELECT DISTINCT id_empleado AS id FROM Masaje) AS usuarios_masaje
-                INNER JOIN (SELECT DISTINCT id_empleado AS id FROM Spa) AS usuarios_spa
-                    ON usuarios_spa.id = usuarios_masaje.id
-            )
-            SELECT
-                (SELECT COUNT(*) FROM Masaje WHERE id_empleado IN (SELECT id FROM ambas)) +
-                (SELECT COUNT(*) FROM Spa WHERE id_empleado IN (SELECT id FROM ambas))
-                AS visitas_ambas
+            SELECT COUNT(*) AS visitas_ambas
+            FROM vista_empleados_tramposos
         `);
 
         res.json(rows[0]);
@@ -164,104 +157,79 @@ const getVisitsBoth = async (req, res) => {
 };
 
 
-//Distribución por rangos de edad de 10 en 10 sobre TODOS los usuarios
-//que visitaron al menos uno de los dos servicios.
-const getEdadesRangos = async (req, res) => {
+//Edades de los usuarios
+const getEdades = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            WITH todos AS (
-                SELECT DISTINCT id_empleado AS id FROM Masaje
-                UNION
-                SELECT DISTINCT id_empleado AS id FROM Spa
-            )
-            SELECT
-                CONCAT(FLOOR(e.edad / 10) * 10, '-', FLOOR(e.edad / 10) * 10 + 9) AS rango,
-                FLOOR(e.edad / 10) * 10 AS orden,
-                COUNT(DISTINCT e.id) AS cantidad,
-                ROUND(
-                    100.0 * COUNT(DISTINCT e.id) /
-                    NULLIF((SELECT COUNT(*) FROM todos), 0),
-                    2
-                ) AS porcentaje
+            SELECT e.id, e.edad
             FROM Empleados e
-            INNER JOIN todos t ON t.id = e.id
-            WHERE e.edad IS NOT NULL
-            GROUP BY rango, orden
-            ORDER BY orden
+            WHERE e.id IN (
+                SELECT DISTINCT id_empleado FROM Masaje
+                UNION
+                SELECT DISTINCT id_empleado FROM Spa
+            )
+            AND e.edad IS NOT NULL
+            ORDER BY e.edad
         `);
 
         res.json(rows);
 
     } catch (error) {
-        console.error('Error al obtener distribución por rangos de edad:', error);
+        console.error('Error al obtener edades:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
 
-//Distribución por género sobre TODOS los usuarios
-//que visitaron al menos uno de los dos servicios.
-//En la BD: 'H' = hombre, 'M' = mujer.
-
-const getGeneroDistribucion = async (req, res) => {
+//Género de los usuarios que visitaron al menos uno de los dos servicios
+const getGeneros = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            WITH todos AS (
-                SELECT DISTINCT id_empleado AS id FROM Masaje
-                UNION
-                SELECT DISTINCT id_empleado AS id FROM Spa
-            )
-            SELECT
-                CASE
-                    WHEN e.genero = 'H' THEN 'Masculino'
-                    WHEN e.genero = 'M' THEN 'Femenino'
-                    ELSE 'No especificado'
-                END AS genero,
-                COUNT(DISTINCT e.id) AS cantidad,
-                ROUND(
-                    100.0 * COUNT(DISTINCT e.id) /
-                    NULLIF((SELECT COUNT(*) FROM todos), 0),
-                    2
-                ) AS porcentaje
+            SELECT e.id, e.genero
             FROM Empleados e
-            INNER JOIN todos t ON t.id = e.id
-            GROUP BY genero
-            ORDER BY genero
+            WHERE e.id IN (
+                SELECT DISTINCT id_empleado FROM Masaje
+                UNION
+                SELECT DISTINCT id_empleado FROM Spa
+            )
+            ORDER BY e.id
         `);
 
         res.json(rows);
 
     } catch (error) {
-        console.error('Error al obtener distribución por género:', error);
+        console.error('Error al obtener géneros:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
 
 //Todos los usuarios que visitaron al menos un servicio, con su tipo:
-//solo_masaje | solo_spa | ambas
-
+//solo_masaje | solo_spa | ambas (misma semana) | mixto (ambos pero nunca la misma semana)
 const getUsuariosConTipo = async (req, res) => {
     try {
         const [rows] = await pool.query(`
             SELECT DISTINCT
-                e.id,
-                e.nombre,
-                e.apellido,
-                e.genero,
-                e.edad,
+                empleado.id,
+                empleado.nombre,
+                empleado.apellido,
+                empleado.genero,
+                empleado.edad,
                 CASE
-                    WHEN m.id IS NOT NULL AND s.id IS NULL THEN 'solo_masaje'
-                    WHEN s.id IS NOT NULL AND m.id IS NULL THEN 'solo_spa'
-                    ELSE 'ambas'
+                    WHEN usuarios_masaje.id IS NOT NULL AND usuarios_spa.id IS NULL THEN 'solo_masaje'
+                    WHEN usuarios_spa.id IS NOT NULL AND usuarios_spa.id IS NULL THEN 'solo_spa'
+                    WHEN vista.id IS NOT NULL THEN 'ambas'
+                    ELSE 'mixto'
                 END AS tipo
-            FROM Empleados e
-            LEFT JOIN (SELECT DISTINCT id_empleado AS id FROM Masaje) m
-                ON m.id = e.id
-            LEFT JOIN (SELECT DISTINCT id_empleado AS id FROM Spa) s
-                ON s.id = e.id
-            WHERE m.id IS NOT NULL OR s.id IS NOT NULL
-            ORDER BY e.id
+            FROM Empleados empleado
+            LEFT JOIN (SELECT DISTINCT id_empleado AS id FROM Masaje) usuarios_masaje
+                ON usuarios_masaje.id = empleado.id
+            LEFT JOIN (SELECT DISTINCT id_empleado AS id FROM Spa) usuarios_spa
+                ON usuarios_spa.id = empleado.id
+            LEFT JOIN (SELECT DISTINCT id FROM vista_empleados_tramposos) vista
+                ON vista.id = empleado.id
+            WHERE usuarios_masaje.id IS NOT NULL OR usuarios_spa.id IS NOT NULL
+            ORDER BY empleado.id
         `);
 
         res.json(rows);
@@ -282,7 +250,7 @@ module.exports = {
     getVisitsSpa,
     getUsersBoth,
     getVisitsBoth,
-    getEdadesRangos,
-    getGeneroDistribucion,
+    getEdades,
+    getGeneros,
     getUsuariosConTipo
 };

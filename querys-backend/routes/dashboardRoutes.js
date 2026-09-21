@@ -49,33 +49,32 @@ router.get(
 );
 
 
-// Usuarios que visitan ambas + % frente a usuarios totales
-// (reutilizada: antes contaba solo coincidencias de la misma semana,
-// sin uso en el front)
+// Usuarios que fueron a ambas alguna vez en la misma semana + %
+// (reutilizada: ahora usa vista_empleados_tramposos, YEARWEEK)
 router.get(
     '/services/repetidores/total',
     dashBoardController.getUsersBoth
 );
 
 
-// Cantidad total de visitas a ambas + % frente a visitas totales
+// Cantidad total de visitas a ambas (pares misma semana) + %
 router.get(
     '/services/ambas/visitas',
     dashBoardController.getVisitsBoth
 );
 
 
-// Distribución por rangos de edad de 10 en 10 (todos los usuarios)
+// Edades crudas de todos los usuarios (el front agrupa en rangos de 10)
 router.get(
-    '/services/edades/rangos',
-    dashBoardController.getEdadesRangos
+    '/services/edades',
+    dashBoardController.getEdades
 );
 
 
-// Distribución por género (todos los usuarios)
+// Géneros crudos de todos los usuarios (el front agrupa por género)
 router.get(
-    '/services/genero/distribucion',
-    dashBoardController.getGeneroDistribucion
+    '/services/genero',
+    dashBoardController.getGeneros
 );
 
 
