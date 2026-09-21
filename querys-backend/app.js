@@ -4,6 +4,7 @@ const port = process.env.PORT || 3000;
 
 const productRoutes = require('./routes/productRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const clientRoutes = require('./routes/clientRoutes');
 
 app.use(express.json());
 
@@ -42,6 +43,7 @@ app.get('/health', (req, res) => {
 
 app.use(productRoutes);
 app.use(dashboardRoutes);
+app.use(clientRoutes);
 
 app.listen(port, () => {
     console.log(`Servidor corriendo en el puerto: ${port}`);

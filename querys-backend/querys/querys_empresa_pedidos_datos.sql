@@ -1,6 +1,4 @@
-USE tiendita;
-
---Clientes
+USE softtek;
 
 INSERT INTO clientes
 (nombre, telefono, email, estatus, categoria, fecha_registro)
@@ -62,9 +60,6 @@ VALUES
 
 SELECT * FROM clientes;
 
-
---Productos Libros
-
 INSERT INTO productos_clientes
 (nombre, precio)
 VALUES
@@ -89,15 +84,12 @@ VALUES
 ('It', 549.00),
 ('El Conde de Montecristo', 599.00);
 
-SELECT * FROM productos_clientes,
-
+SELECT * FROM productos_clientes;
 
 -- Pedidos, 250 pedidos, promedio de 5 por cliente, maximo 10 por cada cliente.
 
 INSERT INTO pedidos (direccion, fecha, id_cliente)
 VALUES
-
--- Clientes 1 - 10
 ('Av. Universidad 101', DATE_SUB(CURDATE(), INTERVAL 5 DAY), 1),
 ('Av. Universidad 101', DATE_SUB(CURDATE(), INTERVAL 35 DAY), 1),
 
