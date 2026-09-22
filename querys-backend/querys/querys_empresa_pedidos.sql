@@ -70,6 +70,14 @@ INNER JOIN productos_clientes ON productos_clientes.id_producto = productos_pedi
 SELECT * FROM VW_Pedidos_Info;
 
 
+
+CREATE VIEW VW_Clientes_Info AS
+SELECT id_cliente AS id, nombre, email, calcular_total_gastado(id_cliente) AS total_gastado, calcular_total_pedidos(id_cliente) AS total_pedidos
+FROM clientes;
+
+SELECT * from vw_clientes_info;
+
+
 -- Funciones
 
 -- Regresa el total gastado de un cliente
