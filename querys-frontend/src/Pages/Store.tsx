@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./Store.css";
 
 type CustomerStatus = "Normal" | "En riesgo" | "Alto gasto";
@@ -9,93 +9,9 @@ interface Customer {
   email: string;
   totalSpent: number;
   orders: number;
-  lastPurchase: string;
   status: CustomerStatus;
   avatar: string;
 }
-
-const customers: Customer[] = [
-  {
-    id: 1,
-    name: "Sofía Martínez",
-    email: "sofia@nova.com",
-    totalSpent: 12450,
-    orders: 18,
-    lastPurchase: "2",
-    status: "Alto gasto",
-    avatar: "SM",
-  },
-  {
-    id: 2,
-    name: "Carlos Ramírez",
-    email: "carlos@techcorp.com",
-    totalSpent: 7350,
-    orders: 12,
-    lastPurchase: "5",
-    status: "Normal",
-    avatar: "CR",
-  },
-  {
-    id: 3,
-    name: "Laura González",
-    email: "laura@digitalmx.com",
-    totalSpent: 2180,
-    orders: 5,
-    lastPurchase: "45",
-    status: "En riesgo",
-    avatar: "LG",
-  },
-  {
-    id: 4,
-    name: "Diego Hernández",
-    email: "diego@vision.com",
-    totalSpent: 18900,
-    orders: 25,
-    lastPurchase: "1",
-    status: "Alto gasto",
-    avatar: "DH",
-  },
-  {
-    id: 5,
-    name: "Ana Torres",
-    email: "ana@marketplus.com",
-    totalSpent: 5600,
-    orders: 9,
-    lastPurchase: "8",
-    status: "Normal",
-    avatar: "AT",
-  },
-  {
-    id: 6,
-    name: "Miguel López",
-    email: "miguel@softlab.com",
-    totalSpent: 1250,
-    orders: 3,
-    lastPurchase: "62",
-    status: "En riesgo",
-    avatar: "ML",
-  },
-  {
-    id: 7,
-    name: "Valeria Sánchez",
-    email: "valeria@grupoalpha.com",
-    totalSpent: 15400,
-    orders: 21,
-    lastPurchase: "3",
-    status: "Alto gasto",
-    avatar: "VS",
-  },
-  {
-    id: 8,
-    name: "Jorge Pérez",
-    email: "jorge@comercialjp.com",
-    totalSpent: 4800,
-    orders: 8,
-    lastPurchase: "12",
-    status: "Normal",
-    avatar: "JP",
-  },
-];
 
 const money = new Intl.NumberFormat("es-MX", {
   style: "currency",
@@ -116,7 +32,7 @@ function evaluateCustomer(customer: Customer): CustomerEvaluation {
   const checks = {
     orders: customer.orders > 10,
     spend: customer.totalSpent > 20000,
-    avg: Number(customer.lastPurchase) >= 4,
+    avg: customer.orders / 3 > 4,
   };
 
   const passedConditions = Object.values(checks).filter(Boolean).length;
@@ -136,15 +52,73 @@ function evaluateCustomer(customer: Customer): CustomerEvaluation {
   };
 }
 
-const evaluatedCustomers = customers.map(evaluateCustomer);
+type ClientApiResponse = {
+  id: number;
+  nombre: string;
+  email: string;
+  total_gastado: number;
+  total_pedidos: number;
+};
+
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+function toCustomer(client: ClientApiResponse): Customer {
+  return {
+    id: client.id,
+    name: client.nombre,
+    email: client.email,
+    totalSpent: Number(client.total_gastado) || 0,
+    orders: Number(client.total_pedidos) || 0,
+    status: "Normal",
+    avatar: client.nombre
+      .split(" ")
+      .map((name) => name[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase(),
+  };
+}
 
 export default function Store() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [activeFilter, setActiveFilter] = useState<
     "Todos" | CustomerStatus
   >("Todos");
 
   const [search, setSearch] = useState("");
   const [menuAbierto, setMenuAbierto] = useState(false);
+
+  useEffect(() => {
+    const getClients = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/clients`);
+
+        if (!response.ok) {
+          throw new Error("No se pudieron obtener los clientes");
+        }
+
+        const data: ClientApiResponse[] = await response.json();
+        setCustomers(data.map(toCustomer));
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "No se pudieron obtener los clientes"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getClients();
+  }, []);
+
+  const evaluatedCustomers = useMemo(
+    () => customers.map(evaluateCustomer),
+    [customers]
+  );
 
   const filteredCustomers = useMemo(() => {
     return evaluatedCustomers.filter((customer) => {
@@ -159,7 +133,7 @@ export default function Store() {
 
       return matchesFilter && matchesSearch;
     });
-  }, [activeFilter, search]);
+  }, [activeFilter, search, evaluatedCustomers]);
 
   const normalCount = evaluatedCustomers.filter(
     (customer) => customer.status === "Normal"
@@ -177,6 +151,34 @@ export default function Store() {
     (total, customer) => total + customer.totalSpent,
     0
   );
+
+  const normalRevenue = evaluatedCustomers
+    .filter((customer) => customer.status === "Normal")
+    .reduce((total, customer) => total + customer.totalSpent, 0);
+
+  const riskRevenue = evaluatedCustomers
+    .filter((customer) => customer.status === "En riesgo")
+    .reduce((total, customer) => total + customer.totalSpent, 0);
+
+  const highSpendRevenue = evaluatedCustomers
+    .filter((customer) => customer.status === "Alto gasto")
+    .reduce((total, customer) => total + customer.totalSpent, 0);
+
+  const percentage = (value: number) =>
+    evaluatedCustomers.length === 0
+      ? 0
+      : (value / evaluatedCustomers.length) * 100;
+
+  const maxSegmentRevenue = Math.max(
+    normalRevenue,
+    riskRevenue,
+    highSpendRevenue,
+    1
+  );
+
+  const normalPercentage = percentage(normalCount);
+  const riskPercentage = percentage(riskCount);
+  const highSpendPercentage = percentage(highSpendCount);
 
   return (
     <div className="clientes dashboard">
@@ -277,9 +279,14 @@ export default function Store() {
             </div>
 
             <div className="donut-wrapper">
-              <div className="donut">
+              <div
+                className="donut"
+                style={{
+                  background: `conic-gradient(#16a34a 0 ${normalPercentage}%, #f59e0b ${normalPercentage}% ${normalPercentage + riskPercentage}%, #8b5cf6 ${normalPercentage + riskPercentage}% 100%)`,
+                }}
+              >
                 <div className="donut-center">
-                  <strong>{customers.length}</strong>
+                  <strong>{evaluatedCustomers.length}</strong>
                   <span>Clientes</span>
                 </div>
               </div>
@@ -291,7 +298,7 @@ export default function Store() {
                     <strong>{normalCount} Clientes</strong>
                     <span>Compradores normales</span>
                   </div>
-                  <b>37.5%</b>
+                  <b>{normalPercentage.toFixed(1)}%</b>
                 </div>
 
                 <div className="legend-item">
@@ -300,7 +307,7 @@ export default function Store() {
                     <strong>{riskCount} Clientes</strong>
                     <span>En riesgo</span>
                   </div>
-                  <b>25.0%</b>
+                  <b>{riskPercentage.toFixed(1)}%</b>
                 </div>
 
                 <div className="legend-item">
@@ -309,7 +316,7 @@ export default function Store() {
                     <strong>{highSpendCount} Clientes</strong>
                     <span>Alto gasto</span>
                   </div>
-                  <b>37.5%</b>
+                  <b>{highSpendPercentage.toFixed(1)}%</b>
                 </div>
               </div>
             </div>
@@ -329,13 +336,13 @@ export default function Store() {
               <div className="bar-row">
                 <div className="bar-label">
                   <span>Alto gasto</span>
-                  <strong>$46.7k</strong>
+                  <strong>{money.format(highSpendRevenue)}</strong>
                 </div>
 
                 <div className="bar-background">
                   <div
                     className="bar purple-bar"
-                    style={{ width: "92%" }}
+                    style={{ width: `${(highSpendRevenue / maxSegmentRevenue) * 100}%` }}
                   />
                 </div>
               </div>
@@ -343,13 +350,13 @@ export default function Store() {
               <div className="bar-row">
                 <div className="bar-label">
                   <span>Normal</span>
-                  <strong>$17.7k</strong>
+                  <strong>{money.format(normalRevenue)}</strong>
                 </div>
 
                 <div className="bar-background">
                   <div
                     className="bar blue-bar"
-                    style={{ width: "48%" }}
+                    style={{ width: `${(normalRevenue / maxSegmentRevenue) * 100}%` }}
                   />
                 </div>
               </div>
@@ -357,13 +364,13 @@ export default function Store() {
               <div className="bar-row">
                 <div className="bar-label">
                   <span>En riesgo</span>
-                  <strong>$3.4k</strong>
+                  <strong>{money.format(riskRevenue)}</strong>
                 </div>
 
                 <div className="bar-background">
                   <div
                     className="bar orange-bar"
-                    style={{ width: "18%" }}
+                    style={{ width: `${(riskRevenue / maxSegmentRevenue) * 100}%` }}
                   />
                 </div>
               </div>
@@ -381,17 +388,6 @@ export default function Store() {
           </div>
 
           <div className="filters">
-            <div className="search-box">
-              <span>⌕</span>
-
-              <input
-                type="text"
-                placeholder="Buscar cliente..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
-
             <div className="filter-buttons">
               {(["Todos", "Normal", "En riesgo", "Alto gasto"] as const).map(
                 (filter) => (
@@ -412,6 +408,8 @@ export default function Store() {
           </div>
 
           <div className="table-container">
+            {loading && <div className="empty-state">Cargando clientes...</div>}
+            {!loading && error && <div className="empty-state">{error}</div>}
             <table>
               <thead>
                 <tr>
@@ -454,7 +452,7 @@ export default function Store() {
 
                     <td>
                       <span className={customer.checks.avg ? "value-positive" : "value-negative"}>
-                        {customer.lastPurchase}
+                        {(customer.orders / 3).toFixed(1)}
                       </span>
                     </td>
 
@@ -476,7 +474,7 @@ export default function Store() {
           <div className="pagination">
             <span>
               Mostrando <strong>1-{filteredCustomers.length}</strong> de{" "}
-              <strong>{customers.length}</strong> clientes
+              <strong>{evaluatedCustomers.length}</strong> clientes
             </span>
 
             <div>
