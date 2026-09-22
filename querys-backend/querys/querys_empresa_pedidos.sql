@@ -57,11 +57,14 @@ CREATE TABLE productos_pedidos(
 
 
 
--- Join para la view
+--Views
 
-
-SELECT productos_pedidos.id_pedido, productos_pedidos.id_producto, productos_pedidos.cantidad, clientes.nombre, productos_clientes.precio
+CREATE VIEW VW_Pedidos_Info AS
+SELECT productos_pedidos.id_pedido, clientes.nombre, productos_clientes.nombre AS libro, productos_pedidos.cantidad, productos_clientes.precio AS precio_unitario,
+clientes.id_cliente
 FROM productos_pedidos
 INNER JOIN pedidos ON productos_pedidos.id_pedido = pedidos.id_pedido
 INNER JOIN clientes ON pedidos.id_cliente = clientes.id_cliente
-INNER JOIN productos_clientes ON productos_clientes.id_producto = productos_pedidos.id_pedido;
+INNER JOIN productos_clientes ON productos_clientes.id_producto = productos_pedidos.id_producto;
+
+SELECT * FROM VW_Pedidos_Info;
