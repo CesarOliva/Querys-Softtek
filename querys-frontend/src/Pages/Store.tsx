@@ -179,7 +179,7 @@ export default function Store() {
   );
 
   return (
-    <div className="dashboard">
+    <div className="clientes dashboard">
       {/* Sidebar */}
       <aside className={`sidebar ${menuAbierto ? "open" : ""}`}>
         <div className="sidebar-container">
