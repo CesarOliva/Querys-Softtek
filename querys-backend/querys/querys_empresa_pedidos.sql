@@ -68,3 +68,47 @@ INNER JOIN clientes ON pedidos.id_cliente = clientes.id_cliente
 INNER JOIN productos_clientes ON productos_clientes.id_producto = productos_pedidos.id_producto;
 
 SELECT * FROM VW_Pedidos_Info;
+
+
+
+CREATE VIEW VW_Clientes_Info AS
+SELECT id_cliente AS id, nombre, email, calcular_total_gastado(id_cliente) AS total_gastado, calcular_total_pedidos(id_cliente) AS total_pedidos
+FROM clientes;
+
+SELECT * from vw_clientes_info;
+
+
+-- Funciones
+
+-- Regresa el total gastado de un cliente
+DELIMITER %%
+CREATE DEFINER=`root`@`localhost` FUNCTION `tiendita`.`calcular_total_gastado`(id INTEGER UNSIGNED) RETURNS decimal(10,2)
+    READS SQL DATA
+BEGIN
+    DECLARE total_cliente DECIMAL (10,2);
+    
+    SELECT SUM(precio_unitario) INTO total_cliente 
+    FROM VW_Pedidos_Info 
+    WHERE id_cliente = id;
+    
+    RETURN total_cliente;
+END%%
+DELIMITER ;
+
+
+-- Regresa el total de pedidos por cliente
+
+DELIMITER %%
+CREATE DEFINER=`root`@`localhost` FUNCTION `tiendita`.`calcular_total_pedidos`(id INTEGER UNSIGNED) RETURNS INTEGER UNSIGNED
+    READS SQL DATA
+BEGIN
+    DECLARE total_pedidos INTEGER UNSIGNED;
+    
+    SELECT COUNT(DISTINCT id_pedido)
+    INTO total_pedidos
+    FROM VW_Pedidos_Info 
+    WHERE id_cliente = id;
+    
+    RETURN total_pedidos;
+END%%
+DELIMITER ;
