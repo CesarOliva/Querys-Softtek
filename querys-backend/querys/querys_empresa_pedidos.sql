@@ -32,19 +32,36 @@ CREATE TABLE productos_clientes(
 
 CREATE TABLE productos_pedidos(
     id_pedido INT UNSIGNED NOT NULL,
+
+    id_producto INT UNSIGNED NOT NULL,
+
+    cantidad INT UNSIGNED NOT NULL,
+
+    PRIMARY KEY (id_pedido, id_producto),
+
     CONSTRAINT fk_pedido
     FOREIGN KEY (id_pedido)
     REFERENCES pedidos (id_pedido)
     ON DELETE CASCADE
     ON UPDATE CASCADE,
 
-    id_producto INT UNSIGNED NOT NULL,
     CONSTRAINT fk_producto
     FOREIGN KEY (id_producto)
     REFERENCES productos_clientes (id_producto)
     ON DELETE CASCADE
     ON UPDATE CASCADE,
 
-    cantidad INT UNSIGNED,
-    CONSTRAINT check_cantidad CHECK (cantidad>=0)
+    CONSTRAINT check_cantidad
+    CHECK (cantidad > 0)
 );
+
+
+
+-- Join para la view
+
+
+SELECT productos_pedidos.id_pedido, productos_pedidos.id_producto, productos_pedidos.cantidad, clientes.nombre, productos_clientes.precio
+FROM productos_pedidos
+INNER JOIN pedidos ON productos_pedidos.id_pedido = pedidos.id_pedido
+INNER JOIN clientes ON pedidos.id_cliente = clientes.id_cliente
+INNER JOIN productos_clientes ON productos_clientes.id_producto = productos_pedidos.id_pedido;
