@@ -78,6 +78,25 @@ FROM clientes;
 SELECT * from vw_clientes_info;
 
 
+-- SP 
+
+DELIMITER %%
+/* Add or remove procedure IN/OUT/INOUT parameters as needed. */
+CREATE PROCEDURE ActualizarCategoria(IN cliente_frecuente BOOLEAN,IN pedidos INT 
+UNSIGNED,IN gasto DECIMAL(10,2), IN id INT UNSIGNED)
+SQL SECURITY DEFINER
+NOT DETERMINISTIC
+BEGIN
+	UPDATE clientes
+    SET categoria = CASE
+		WHEN pedidos <= 10 AND gasto <= 5000.00 THEN 2
+        WHEN pedidos > 10 AND gasto >= 20000.00 AND cliente_frecuente THEN 3
+        ELSE 1
+	END
+    WHERE id_cliente = id;
+END%%
+DELIMITER ;
+
 -- Funciones
 
 -- Regresa el total gastado de un cliente
@@ -112,6 +131,77 @@ BEGIN
     RETURN total_pedidos;
 END%%
 DELIMITER ;
+
+DELIMITER //
+
+-- TriggerS
+
+CREATE TRIGGER asignar_categoria
+AFTER INSERT ON pedidos
+FOR EACH ROW
+BEGIN
+	DECLARE pedidos_ultimos_90_dias INT UNSIGNED;
+    DECLARE gasto DECIMAL(10,2);
+    DECLARE cliente_frecuente BOOLEAN;
+    
+    DECLARE mes_actual INT;
+    DECLARE anio_actual INT;
+    
+    DECLARE mes_anterior INT;
+    DECLARE anio_anterior INT;
+    
+    DECLARE mes_hace_dos INT;
+    DECLARE anio_hace_dos INT;
+    
+    DECLARE p_actual INT UNSIGNED;
+    DECLARE p_anterior INT UNSIGNED;
+    DECLARE p_hace_dos INT UNSIGNED;
+    
+    SET pedidos_ultimos_90_dias = calcular_total_pedidos(NEW.id_cliente);
+    SET gasto = calcular_total_gastado(NEW.id_cliente);
+    
+    SET mes_actual = MONTH(NEW.fecha);
+    SET anio_actual = YEAR(NEW.fecha);
+    
+    SET mes_anterior = MONTH(DATE_SUB(NEW.fecha, INTERVAL 1 MONTH));
+    SET anio_anterior = YEAR(DATE_SUB(NEW.fecha, INTERVAL 1 MONTH));
+    
+    SET mes_hace_dos = MONTH(DATE_SUB(NEW.fecha, INTERVAL 2 MONTH));
+    SET anio_hace_dos = YEAR(DATE_SUB(NEW.fecha, INTERVAL 2 MONTH));
+    
+    SET p_actual = consultar_pedidos_en_mes(NEW.id_cliente, mes_actual, anio_actual);
+    SET p_anterior = consultar_pedidos_en_mes(NEW.id_cliente, mes_anterior, anio_anterior);
+    SET p_hace_dos = consultar_pedidos_en_mes(NEW.id_cliente, mes_hace_dos, anio_hace_dos);
+    
+    IF p_actual >= 4 AND p_anterior >= 4 AND p_hace_dos >= 4 THEN
+        SET cliente_frecuente = TRUE;
+    ELSE
+        SET cliente_frecuente = FALSE;
+    END IF;
+
+    CALL ActualizarCategoria(cliente_frecuente, pedidos_ultimos_90_dias, gasto, NEW.id_cliente)
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE FUNCTION consultar_pedidos_en_mes (_id_cliente INT UNSIGNED, mes INT, anio INT)
+RETURNS INT UNSIGNED
+DETERMINISTIC
+BEGIN
+	DECLARE cantidad_pedidos INT UNSIGNED;
+    
+    SELECT COUNT(*) INTO cantidad_pedidos
+    FROM pedidos
+    WHERE id_cliente = _id_cliente AND MONTH(fecha) = mes AND YEAR(fecha) = anio;
+    
+    RETURN cantidad_pedidos;
+END //
+
+DELIMITER ;
+
+
 
 -- Correcion en los inserts
 
