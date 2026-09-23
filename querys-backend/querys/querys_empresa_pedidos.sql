@@ -78,6 +78,25 @@ FROM clientes;
 SELECT * from vw_clientes_info;
 
 
+-- SP 
+
+DELIMITER %%
+/* Add or remove procedure IN/OUT/INOUT parameters as needed. */
+CREATE PROCEDURE ActualizarCategoria(IN cliente_frecuente BOOLEAN,IN pedidos INT 
+UNSIGNED,IN gasto DECIMAL(10,2), IN id INT UNSIGNED)
+SQL SECURITY DEFINER
+NOT DETERMINISTIC
+BEGIN
+	UPDATE clientes
+    SET categoria = CASE
+		WHEN pedidos <= 10 AND gasto <= 5000.00 THEN 2
+        WHEN pedidos > 10 AND gasto >= 20000.00 AND cliente_frecuente THEN 3
+        ELSE 1
+	END
+    WHERE id_cliente = id;
+END%%
+DELIMITER ;
+
 -- Funciones
 
 -- Regresa el total gastado de un cliente
@@ -115,13 +134,15 @@ DELIMITER ;
 
 DELIMITER //
 
+-- TriggerS
+
 CREATE TRIGGER asignar_categoria
 AFTER INSERT ON pedidos
 FOR EACH ROW
 BEGIN
 	DECLARE pedidos_ultimos_90_dias INT UNSIGNED;
-    DECLARE gasto INT UNSIGNED;
-    DECLARE pedidos_al_mes BOOLEAN;
+    DECLARE gasto DECIMAL(10,2);
+    DECLARE cliente_frecuente BOOLEAN;
     
     DECLARE mes_actual INT;
     DECLARE anio_actual INT;
@@ -153,18 +174,12 @@ BEGIN
     SET p_hace_dos = consultar_pedidos_en_mes(NEW.id_cliente, mes_hace_dos, anio_hace_dos);
     
     IF p_actual >= 4 AND p_anterior >= 4 AND p_hace_dos >= 4 THEN
-        SET pedidos_al_mes = TRUE;
+        SET cliente_frecuente = TRUE;
     ELSE
-        SET pedidos_al_mes = FALSE;
+        SET cliente_frecuente = FALSE;
     END IF;
-    
-	UPDATE clientes
-    SET categoria = CASE
-		WHEN pedidos_ultimos_90_dias <= 10 AND gasto <= 5000.00 THEN 2
-        WHEN pedidos_ultimos_90_dias > 10 AND gasto >= 20000.00 AND pedidos_al_mes THEN 3
-        ELSE 1
-	END
-    WHERE id_cliente = NEW.id_cliente;
+
+    CALL ActualizarCategoria(cliente_frecuente, pedidos_ultimos_90_dias, gasto, NEW.id_cliente)
 END //
 
 DELIMITER ;
@@ -185,3 +200,47 @@ BEGIN
 END //
 
 DELIMITER ;
+
+
+
+-- Correcion en los inserts
+
+
+-- id 47 -> Marco hizo pedido 146
+
+INSERT INTO productos_pedidos(id_pedido, id_producto, cantidad)
+VALUES (146,5,1);
+
+-- id 48 -> karla hizo pedido 147,148, 
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (147, 11,4);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (148,12,3);
+
+-- id 49 -> alberto hizo pedido 149, 150, 151, 152, 153
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (149,13,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (150,3,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (151,14,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (152,15,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (153,16,1);
+
+-- id 50 -> brenda hizo pediso 154, 155
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (154,6,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (155,5,1);
+
+
+
