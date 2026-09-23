@@ -185,8 +185,8 @@ CREATE PROCEDURE AsignarCategoria(IN id_cliente INT UNSIGNED, IN fecha DATETIME)
 
 BEGIN
 	DECLARE pedidos_ultimos_90_dias INT UNSIGNED;
-    DECLARE gasto DECIMAL(10,2);
-    DECLARE cliente_frecuente BOOLEAN;
+    DECLARE gasto INT UNSIGNED;
+    DECLARE pedidos_al_mes BOOLEAN;
     
     DECLARE mes_actual INT;
     DECLARE anio_actual INT;
@@ -227,45 +227,23 @@ END //
 DELIMITER ;
 
 
+DELIMITER //
 
--- Correcion en los inserts
+CREATE PROCEDURE CrearProductosDelPedido(
+	IN _id_pedido INT,
+    IN productos_data JSON
+)
+BEGIN
+	INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+    SELECT _id_pedido, jt.id_producto, jt.cantidad
+    FROM JSON_TABLE(
+		productos_data,
+        '$[*]'
+        COLUMNS (
+			id_producto INT UNSIGNED PATH '$.producto',
+            cantidad INT UNSIGNED PATH '$.cantidad'
+        )
+    ) AS jt;
+END //
 
-
--- id 47 -> Marco hizo pedido 146
-
-INSERT INTO productos_pedidos(id_pedido, id_producto, cantidad)
-VALUES (146,5,1);
-
--- id 48 -> karla hizo pedido 147,148, 
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (147, 11,4);
-
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (148,12,3);
-
--- id 49 -> alberto hizo pedido 149, 150, 151, 152, 153
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (149,13,1);
-
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (150,3,1);
-
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (151,14,1);
-
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (152,15,1);
-
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (153,16,1);
-
--- id 50 -> brenda hizo pediso 154, 155
-
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (154,6,1);
-
-INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
-VALUES (155,5,1);
-
-
-
+DELIMITER ;
