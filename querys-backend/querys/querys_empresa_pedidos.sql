@@ -112,3 +112,76 @@ BEGIN
     RETURN total_pedidos;
 END%%
 DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER asignar_categoria
+AFTER INSERT ON pedidos
+FOR EACH ROW
+BEGIN
+	DECLARE pedidos_ultimos_90_dias INT UNSIGNED;
+    DECLARE gasto INT UNSIGNED;
+    DECLARE pedidos_al_mes BOOLEAN;
+    
+    DECLARE mes_actual INT;
+    DECLARE anio_actual INT;
+    
+    DECLARE mes_anterior INT;
+    DECLARE anio_anterior INT;
+    
+    DECLARE mes_hace_dos INT;
+    DECLARE anio_hace_dos INT;
+    
+    DECLARE p_actual INT UNSIGNED;
+    DECLARE p_anterior INT UNSIGNED;
+    DECLARE p_hace_dos INT UNSIGNED;
+    
+    SET pedidos_ultimos_90_dias = calcular_total_pedidos(NEW.id_cliente);
+    SET gasto = calcular_total_gastado(NEW.id_cliente);
+    
+    SET mes_actual = MONTH(NEW.fecha);
+    SET anio_actual = YEAR(NEW.fecha);
+    
+    SET mes_anterior = MONTH(DATE_SUB(NEW.fecha, INTERVAL 1 MONTH));
+    SET anio_anterior = YEAR(DATE_SUB(NEW.fecha, INTERVAL 1 MONTH));
+    
+    SET mes_hace_dos = MONTH(DATE_SUB(NEW.fecha, INTERVAL 2 MONTH));
+    SET anio_hace_dos = YEAR(DATE_SUB(NEW.fecha, INTERVAL 2 MONTH));
+    
+    SET p_actual = consultar_pedidos_en_mes(NEW.id_cliente, mes_actual, anio_actual);
+    SET p_anterior = consultar_pedidos_en_mes(NEW.id_cliente, mes_anterior, anio_anterior);
+    SET p_hace_dos = consultar_pedidos_en_mes(NEW.id_cliente, mes_hace_dos, anio_hace_dos);
+    
+    IF p_actual >= 4 AND p_anterior >= 4 AND p_hace_dos >= 4 THEN
+        SET pedidos_al_mes = TRUE;
+    ELSE
+        SET pedidos_al_mes = FALSE;
+    END IF;
+    
+	UPDATE clientes
+    SET categoria = CASE
+		WHEN pedidos_ultimos_90_dias <= 10 AND gasto <= 5000.00 THEN 2
+        WHEN pedidos_ultimos_90_dias > 10 AND gasto >= 20000.00 AND pedidos_al_mes THEN 3
+        ELSE 1
+	END
+    WHERE id_cliente = NEW.id_cliente;
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE FUNCTION consultar_pedidos_en_mes (_id_cliente INT UNSIGNED, mes INT, anio INT)
+RETURNS INT UNSIGNED
+DETERMINISTIC
+BEGIN
+	DECLARE cantidad_pedidos INT UNSIGNED;
+    
+    SELECT COUNT(*) INTO cantidad_pedidos
+    FROM pedidos
+    WHERE id_cliente = _id_cliente AND MONTH(fecha) = mes AND YEAR(fecha) = anio;
+    
+    RETURN cantidad_pedidos;
+END //
+
+DELIMITER ;
