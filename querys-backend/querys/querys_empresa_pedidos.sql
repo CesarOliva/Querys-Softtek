@@ -112,3 +112,45 @@ BEGIN
     RETURN total_pedidos;
 END%%
 DELIMITER ;
+
+-- Correcion en los inserts
+
+
+-- id 47 -> Marco hizo pedido 146
+
+INSERT INTO productos_pedidos(id_pedido, id_producto, cantidad)
+VALUES (146,5,1);
+
+-- id 48 -> karla hizo pedido 147,148, 
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (147, 11,4);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (148,12,3);
+
+-- id 49 -> alberto hizo pedido 149, 150, 151, 152, 153
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (149,13,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (150,3,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (151,14,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (152,15,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (153,16,1);
+
+-- id 50 -> brenda hizo pediso 154, 155
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (154,6,1);
+
+INSERT INTO productos_pedidos (id_pedido, id_producto, cantidad)
+VALUES (155,5,1);
+
+
+
