@@ -88,7 +88,6 @@ export default function Store() {
   >("Todos");
 
   const [search, setSearch] = useState("");
-  const [menuAbierto, setMenuAbierto] = useState(false);
 
   useEffect(() => {
     const getClients = async () => {
@@ -182,37 +181,6 @@ export default function Store() {
 
   return (
     <div className="clientes dashboard">
-      {/* Sidebar */}
-      <aside className={`sidebar ${menuAbierto ? "open" : ""}`}>
-        <div className="sidebar-container">
-          <div className="logo">
-            <div className="logo-icon">+</div>
-            <div>
-              <strong>NovaCRM</strong>
-              <span>Analytics</span>
-            </div>
-          </div>
-
-          <nav>
-            <a href="#dashboard" className="nav-item active" onClick={() => setMenuAbierto(false)}>
-             
-              Dashboard
-            </a>
-
-            <a href="#chart" className="nav-item" onClick={() => setMenuAbierto(false)}>
-        
-              Graficas
-            </a>
-
-            <a href="#clientes" className="nav-item" onClick={() => setMenuAbierto(false)}>
-          
-              Analitica
-            </a>
-          </nav>
-        </div>
-      </aside>
-
-      {/* Main */}
       <main className="main">
         <header className="topbar">
           <div>
