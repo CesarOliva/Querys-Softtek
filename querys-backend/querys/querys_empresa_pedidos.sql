@@ -88,7 +88,7 @@ SELECT * from vw_clientes_info;
 
 -- Regresa el total gastado de un cliente
 DELIMITER %%
-CREATE DEFINER=`root`@`localhost` FUNCTION `tiendita`.`calcular_total_gastado`(id INTEGER UNSIGNED) RETURNS decimal(10,2)
+CREATE DEFINER=`root`@`localhost` FUNCTION `softtek`.`calcular_total_gastado`(id INTEGER UNSIGNED) RETURNS decimal(10,2)
     READS SQL DATA
 BEGIN
     DECLARE total_cliente DECIMAL (10,2);
@@ -104,7 +104,7 @@ DELIMITER ;
 
 -- Regresa el total de pedidos por cliente
 DELIMITER %%
-CREATE DEFINER=`root`@`localhost` FUNCTION `tiendita`.`calcular_total_pedidos`(id INTEGER UNSIGNED) RETURNS INTEGER UNSIGNED
+CREATE DEFINER=`root`@`localhost` FUNCTION `softtek`.`calcular_total_pedidos`(id INTEGER UNSIGNED) RETURNS INTEGER UNSIGNED
     READS SQL DATA
 BEGIN
     DECLARE total_pedidos INTEGER UNSIGNED;
@@ -130,27 +130,19 @@ CREATE FUNCTION CrearPedidos(
 )
 RETURNS INT UNSIGNED
 MODIFIES SQL DATA
+DETERMINISTIC
 BEGIN
-
     DECLARE nuevo_id INT UNSIGNED;
 
-    INSERT INTO pedidos (
-        direccion,
-        fecha,
-        id_cliente
-    )
-    VALUES (
-        p_direccion,
-        p_fecha,
-        p_id_cliente
-    );
+    INSERT INTO pedidos (direccion, fecha, id_cliente)
+    VALUES (p_direccion, p_fecha, p_id_cliente);
 
     SET nuevo_id = LAST_INSERT_ID();
 
     RETURN nuevo_id;
-
 END;
 
+DELIMITER //
 
 -- SP 
 
@@ -167,7 +159,6 @@ BEGIN
     CALL CrearProductosDelPedido(id_pedido_generado, datos_pedido);
 
     --Call AsignarCategoria(id_cliente, fecha);
-
 END
 
 

@@ -32,7 +32,7 @@ function evaluateCustomer(customer: Customer): CustomerEvaluation {
   const checks = {
     orders: customer.orders > 10,
     spend: customer.totalSpent > 20000,
-    avg: customer.orders / 3 > 4,
+    avg: customer.orders / 3 >= 4,
   };
 
   const passedConditions = Object.values(checks).filter(Boolean).length;
