@@ -118,7 +118,6 @@ function Dashboard() {
     idUsuario: "",
     tipo: "",
   });
-  const [menuAbierto, setMenuAbierto] = useState(false);
 
   useEffect(() => {
     const cargarDashboard = async () => {
@@ -329,40 +328,8 @@ function Dashboard() {
         rel="stylesheet"
       />
 
-      <aside className={`sidebar ${menuAbierto ? "open" : ""}`}>
-        <div className="sidebar-container">
-          <div className="logo">
-            <div className="logo-icon">+</div>
-            <div>
-              <strong>HealthCare</strong>
-              <span>Dashboard</span>
-            </div>
-          </div>
-
-          <nav>
-            <a href="#dashboard" className="nav-item active" onClick={() => setMenuAbierto(false)}>
-              <span>▦</span>
-              Dashboard
-            </a>
-
-            <a href="#reportes" className="nav-item" onClick={() => setMenuAbierto(false)}>
-              <span>📊</span>
-              Reportes
-            </a>
-
-            <a href="#usuarios" className="nav-item" onClick={() => setMenuAbierto(false)}>
-              <span>👥</span>
-              Usuarios
-            </a>
-          </nav>
-        </div>
-      </aside>
-
       <main className="main" id="dashboard">
         <header className="header">
-          <button className="mobile-menu" onClick={() => setMenuAbierto(!menuAbierto)}>
-            ☰
-          </button>
 
           <div>
             <h1>Dashboard de servicios</h1>

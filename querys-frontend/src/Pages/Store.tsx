@@ -60,7 +60,27 @@ type ClientApiResponse = {
   total_pedidos: number;
 };
 
+type BestSellerApiResponse = {
+  nombre: string;
+  Cantidad: number;
+  total_ventas: number;
+};
+
+interface BestSeller {
+  name: string;
+  sales: number;
+  revenue: number;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+function toBestSeller(item: BestSellerApiResponse): BestSeller {
+  return {
+    name: item.nombre,
+    sales: Number(item.Cantidad) || 0,
+    revenue: Number(item.total_ventas) || 0,
+  };
+}
 
 function toCustomer(client: ClientApiResponse): Customer {
   return {
@@ -83,12 +103,14 @@ export default function Store() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
+  const [bestSellersLoading, setBestSellersLoading] = useState(true);
+  const [bestSellersError, setBestSellersError] = useState("");
   const [activeFilter, setActiveFilter] = useState<
     "Todos" | CustomerStatus
   >("Todos");
 
   const [search, setSearch] = useState("");
-  const [menuAbierto, setMenuAbierto] = useState(false);
 
   useEffect(() => {
     const getClients = async () => {
@@ -113,6 +135,31 @@ export default function Store() {
     };
 
     getClients();
+  }, []);
+
+  useEffect(() => {
+    const getBestSellers = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/clients/best-sellers`);
+
+        if (!response.ok) {
+          throw new Error("No se pudieron obtener los best sellers");
+        }
+
+        const data: BestSellerApiResponse[] = await response.json();
+        setBestSellers(data.map(toBestSeller));
+      } catch (requestError) {
+        setBestSellersError(
+          requestError instanceof Error
+            ? requestError.message
+            : "No se pudieron obtener los best sellers"
+        );
+      } finally {
+        setBestSellersLoading(false);
+      }
+    };
+
+    getBestSellers();
   }, []);
 
   const evaluatedCustomers = useMemo(
@@ -182,37 +229,6 @@ export default function Store() {
 
   return (
     <div className="clientes dashboard">
-      {/* Sidebar */}
-      <aside className={`sidebar ${menuAbierto ? "open" : ""}`}>
-        <div className="sidebar-container">
-          <div className="logo">
-            <div className="logo-icon">+</div>
-            <div>
-              <strong>NovaCRM</strong>
-              <span>Analytics</span>
-            </div>
-          </div>
-
-          <nav>
-            <a href="#dashboard" className="nav-item active" onClick={() => setMenuAbierto(false)}>
-             
-              Dashboard
-            </a>
-
-            <a href="#chart" className="nav-item" onClick={() => setMenuAbierto(false)}>
-        
-              Graficas
-            </a>
-
-            <a href="#clientes" className="nav-item" onClick={() => setMenuAbierto(false)}>
-          
-              Analitica
-            </a>
-          </nav>
-        </div>
-      </aside>
-
-      {/* Main */}
       <main className="main">
         <header className="topbar">
           <div>
@@ -375,6 +391,79 @@ export default function Store() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Best sellers */}
+        <section className="customers-card">
+          <div className="table-header">
+            <div>
+              <h2>Best sellers</h2>
+              <p>Los 10 libros más vendidos.</p>
+            </div>
+          </div>
+
+          <div className="table-container">
+            {bestSellersLoading && (
+              <div className="empty-state">Cargando best sellers...</div>
+            )}
+            {!bestSellersLoading && bestSellersError && (
+              <div className="empty-state">{bestSellersError}</div>
+            )}
+
+            <table className="best-sellers-table">
+              <thead>
+                <tr>
+                  <th>RANK</th>
+                  <th>LIBRO</th>
+                  <th>VENTAS</th>
+                  <th>INGRESO</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {bestSellers.map((book, index) => (
+                  <tr key={`${book.name}-${index}`}>
+                    <td>
+                      <span className="rank-badge">{index + 1}</span>
+                    </td>
+
+                    <td>
+                      <div className="customer-cell">
+                        <div className="customer-avatar">
+                          {book.name
+                            .split(" ")
+                            .map((word) => word[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </div>
+
+                        <div>
+                          <strong>{book.name}</strong>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td>
+                      <span className="value-positive">{book.sales}</span>
+                    </td>
+
+                    <td>
+                      <strong>{money.format(book.revenue)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {!bestSellersLoading &&
+              !bestSellersError &&
+              bestSellers.length === 0 && (
+                <div className="empty-state">
+                  No se encontraron best sellers.
+                </div>
+              )}
           </div>
         </section>
 
