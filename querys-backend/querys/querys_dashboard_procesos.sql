@@ -1,4 +1,4 @@
-use tiendita;
+use SOFTTEK;
 
 -- Vista con todos los datos de los empleados que repiten 
 

@@ -1,3 +1,7 @@
+CREATE DATABASE SOFTTEK;
+
+USE SOFTTEK;
+
 CREATE TABLE producto (
 	id_producto INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -9,7 +13,7 @@ CREATE TABLE producto (
 );
 
 INSERT INTO producto
-    (id_producto, nombre, descripcion, categoria, status, precio, stock)
+    (nombre, descripcion, categoria, status, precio, stock)
 VALUES
     ('Teclado mecánico', 'Teclado mecánico RGB con conexión USB', 'Periféricos', TRUE, 899.99, 15),
     ('Mouse inalámbrico', 'Mouse ergonómico con receptor USB', 'Periféricos', TRUE, 349.90, 30),
@@ -58,20 +62,6 @@ BEGIN
 END//
  
 DELIMITER ;
-
-CREATE VIEW vw_productos AS
-    SELECT id_producto AS id, nombre, descripcion, categoria, status, precio, stock
-    FROM producto;
-
-CREATE VIEW vw_productos_bajo_stock AS
-    SELECT id_producto AS id, nombre, descripcion, categoria, status, precio, stock
-    FROM producto
-    WHERE
-        (stock <= 10 AND precio > 100)
-        OR
-        (stock <= 3 AND precio <= 100)
-    ORDER BY stock, id_producto;
-
 
 -- Views para mostrar los productos
 

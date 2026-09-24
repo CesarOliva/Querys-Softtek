@@ -118,7 +118,8 @@ select {
 }
 
 .sidebar{
-  width: 300px !important;
+  min-width: 250px;
+  width: 250px;
 }
 
 .sidebar .sidebar-container {

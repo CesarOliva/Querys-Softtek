@@ -1,4 +1,4 @@
-use tiendita;
+use SOFTTEK;
 
 -- Tablas
 CREATE TABLE Departamentos(
