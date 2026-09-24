@@ -165,7 +165,7 @@ BEGIN
     SET id_pedido_generado = CrearPedidos(direccion, fecha, id_cliente);
 
     CALL CrearProductosDelPedido(id_pedido_generado, datos_pedido);
-;
+
     --Call AsignarCategoria(id_cliente, fecha);
 
 END
@@ -180,7 +180,7 @@ BEGIN
     SELECT _id_pedido, jt.id_producto, jt.cantidad
     FROM JSON_TABLE(
 		productos_data,
-        '$[*]'
+        '$[*]' 
         COLUMNS (
 			id_producto INT UNSIGNED PATH '$.producto',
             cantidad INT UNSIGNED PATH '$.cantidad'
