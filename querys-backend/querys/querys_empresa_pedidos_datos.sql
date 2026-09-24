@@ -478,3 +478,20 @@ VALUES
 (143, 2, 3), (143, 8, 1),
 (144, 5, 1), (144, 11, 2),
 (145, 8, 2), (145, 14, 1), (145, 20, 1);
+
+
+-- Insert de prueba con estructura JSON para productos_pedidos
+DELIMITER //
+
+CALL InsertarDatos(
+    1,
+    NOW(),
+    'Av. Siempre Viva 123, Springfield',
+    '[
+        {"producto": 15, "cantidad": 2},
+        {"producto": 19, "cantidad": 5}
+    ]'
+);
+//
+
+DELIMITER ;
