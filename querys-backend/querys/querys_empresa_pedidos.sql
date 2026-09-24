@@ -57,7 +57,13 @@ CREATE TABLE productos_pedidos(
     CHECK (cantidad > 0)
 );
 
+-- group by query
 
+SELECT productos_clientes.nombre, SUM(productos_pedidos.cantidad) AS Cantidad, productos_clientes.precio * SUM(productos_pedidos.cantidad) AS total_ventas
+FROM productos_pedidos
+INNER JOIN productos_clientes ON productos_pedidos.id_producto = productos_clientes.id_producto
+GROUP by productos_clientes.nombre, productos_clientes.precio
+ORDER BY total_ventas;
 
 --Views
 
